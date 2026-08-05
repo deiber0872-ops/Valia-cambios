@@ -502,6 +502,14 @@ const RUTAS = {
     defCompra: 950, defVenta: 3.44,
     comisionAplicaA: null, defComision: 0
   },
+  PE_CL: {
+    label: "Perú → Chile", short: "PE → CL",
+    monedaOrigen: "PEN", monedaDestino: "CLP",
+    paisOrigen: "Perú", paisDestino: "Chile",
+    flagOrigen: "🇵🇪", flagDestino: "🇨🇱",
+    defCompra: 3.44, defVenta: 950,
+    comisionAplicaA: null, defComision: 0
+  },
   PE_VE: {
     label: "Perú → Venezuela", short: "PE → VE",
     monedaOrigen: "PEN", monedaDestino: "Bs",
@@ -896,6 +904,36 @@ function todayYYYYMMDD(){
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 }
+function displayADateISO(display){
+  // convierte dd/mm/yyyy (como se guardaba la fecha desde el principio) a yyyy-mm-dd
+  if (!display) return '';
+  const m = display.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if (!m) return '';
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+// Las operaciones registradas antes de esta version no traen paisOrigen/paisDestino/isoFecha.
+// Esta migracion los reconstruye una sola vez a partir de datos que SI existian desde siempre
+// (el texto de la ruta y la fecha en formato dd/mm/yyyy), para que los filtros del historial
+// tambien funcionen con operaciones antiguas.
+function migrarHistorialAntiguo(hist){
+  let cambiado = false;
+  hist.forEach(h => {
+    if (!h.paisOrigen || !h.paisDestino){
+      const partes = (h.ruta || '').split('→').map(s => s.trim());
+      if (partes.length === 2){
+        h.paisOrigen = partes[0];
+        h.paisDestino = partes[1];
+        cambiado = true;
+      }
+    }
+    if (!h.isoFecha){
+      const iso = displayADateISO(h.fecha);
+      if (iso){ h.isoFecha = iso; cambiado = true; }
+    }
+  });
+  if (cambiado) saveHistorial(hist);
+  return hist;
+}
 function yyyymmddADisplay(v){
   if (!v) return new Date().toLocaleDateString('es-CL', {day:'2-digit',month:'2-digit',year:'numeric'});
   const [y,m,d] = v.split('-');
@@ -1214,7 +1252,7 @@ function loadConfig(){
 function loadHistorial(){
   try{
     const raw = localStorage.getItem('valia_historial');
-    if (raw) return JSON.parse(raw);
+    if (raw) return migrarHistorialAntiguo(JSON.parse(raw));
   }catch(e){}
   return [];
 }
