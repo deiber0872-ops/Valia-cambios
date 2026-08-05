@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>VALIA · Calculadora</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="VALIA">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#0A3F3B">
+<style>
+  :root{
+    --ink:#0F2A2E;
+    --paper:#F4F1E9;
+    --panel:#FFFFFF;
+    --teal:#0F5C56;
+    --teal-deep:#0A3F3B;
+    --gold:#C79A3E;
+    --line:#DCD4C2;
+    --muted:#6B7570;
+    --warn-bg:rgba(178,58,58,0.16);
+    --warn-text:#B23A3A;
+    --input-bg:#FCFBF8;
+    --input-unit-bg:#F1EEE4;
+    --btn-bg:#FFFFFF;
+  }
+  html[data-theme="dark"]{
+    --ink:#EDEAE0;
+    --paper:#12211F;
+    --panel:#1B2D2A;
+    --teal:#2E9188;
+    --teal-deep:#0A3F3B;
+    --gold:#D9AE55;
+    --line:#33473F;
+    --muted:#93A19B;
+    --warn-bg:rgba(224,110,110,0.18);
+    --warn-text:#E06E6E;
+    --input-bg:#1F332F;
+    --input-unit-bg:#28403A;
+    --btn-bg:#1F332F;
+  }
+  body, .card, .input-row, .route-btn, .margin-btns button, .btn-secondary{
+    transition:background-color .2s, border-color .2s, color .2s;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Segoe UI', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:480px;margin:0 auto;padding:0 0 50px;}
+
+  header{
+    background:linear-gradient(160deg,var(--teal-deep),var(--teal));
+    color:#fff;
+    padding:22px 20px 20px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+  }
+  header::after{
+    content:"";position:absolute;right:-30px;top:-30px;
+    width:140px;height:140px;border-radius:50%;
+    background:rgba(255,255,255,0.06);
+    pointer-events:none;
+  }
+  header img.logo{width:64px;height:auto;margin-bottom:4px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.2));}
+  header .brand{font-family:Georgia,serif;font-size:22px;font-weight:700;letter-spacing:.04em;margin:2px 0 2px;}
+  header .sub{font-size:12px;color:var(--gold);text-transform:uppercase;letter-spacing:.12em;font-weight:700;}
+  .date-pill{
+    display:inline-block;margin-top:10px;
+    background:rgba(255,255,255,0.12);
+    border:1px solid rgba(255,255,255,0.25);
+    padding:5px 12px;border-radius:20px;
+    font-size:11.5px;font-variant-numeric:tabular-nums;
+  }
+  .operador-pill{
+    display:inline-block;margin-top:8px;margin-left:6px;
+    background:rgba(199,154,62,0.22);
+    border:1px solid rgba(199,154,62,0.5);
+    padding:5px 12px;border-radius:20px;
+    font-size:11.5px;color:#F4E3B8;cursor:pointer;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  section{padding:16px 16px 4px;}
+  .card{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:15px 15px 17px;
+    margin-bottom:12px;
+  }
+  .card-title{
+    font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--teal);margin:0 0 12px;display:flex;align-items:center;gap:6px;
+  }
+  .card-title .n{
+    background:var(--teal);color:#fff;width:18px;height:18px;border-radius:50%;
+    display:inline-flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;
+  }
+
+  /* Selector de ruta agrupado por pais */
+  .country-list{display:flex;flex-direction:column;gap:8px;}
+  .country-btn{
+    width:100%;display:flex;align-items:center;justify-content:space-between;
+    padding:11px 13px;border-radius:12px;border:1.5px solid var(--line);
+    background:var(--input-bg);color:var(--ink);font-weight:700;font-size:13.5px;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .country-btn .flag{font-size:19px;margin-right:8px;}
+  .country-btn .country-count{font-weight:400;color:var(--muted);font-size:11px;margin-left:6px;}
+  .country-btn.open{border-color:var(--teal);}
+  .country-chevron{transition:transform .2s;color:var(--muted);font-size:11px;}
+  .country-btn.open .country-chevron{transform:rotate(180deg);}
+  .country-routes{max-height:0;overflow:hidden;transition:max-height .25s ease;}
+  .country-routes.open{max-height:600px;}
+  .route-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px 2px 2px;}
+  .route-btn{
+    position:relative;padding:10px 8px;border-radius:10px;border:1.5px solid var(--line);
+    background:var(--input-bg);color:var(--teal-deep);font-size:12.5px;font-weight:600;
+    text-align:center;-webkit-tap-highlight-color:transparent;line-height:1.3;
+  }
+  .route-btn.active{background:var(--teal);color:#fff;border-color:var(--teal);}
+  .route-btn small{display:block;font-weight:400;opacity:.8;font-size:10.5px;margin-top:2px;}
+  .route-btn .badge-nueva{
+    position:absolute;top:-7px;right:-6px;background:var(--gold);color:var(--teal-deep);
+    font-size:8.5px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;
+    padding:2px 5px;border-radius:8px;
+  }
+
+  .field{margin-bottom:12px;}
+  .field:last-child{margin-bottom:0;}
+  label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px;}
+  .input-row{
+    display:flex;align-items:center;
+    border:1.5px solid var(--line);border-radius:10px;
+    background:var(--input-bg);overflow:hidden;
+  }
+  .input-row:focus-within{border-color:var(--teal);}
+  .input-row span.unit{
+    padding:0 10px;font-size:12px;color:var(--muted);white-space:nowrap;
+    border-right:1px solid var(--line);background:var(--input-unit-bg);
+    align-self:stretch;display:flex;align-items:center;min-width:52px;justify-content:center;
+  }
+  input[type=number], input[type=text]{
+    flex:1;border:0;background:transparent;padding:11px 12px;
+    font-size:16px;color:var(--ink);width:100%;font-variant-numeric:tabular-nums;
+  }
+  input:focus{outline:none;}
+
+  .margin-btns{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .margin-btns button{
+    flex:1;min-width:58px;padding:8px 4px;border-radius:8px;border:1px solid var(--line);
+    background:var(--btn-bg);color:var(--teal-deep);font-size:12px;font-weight:600;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .margin-btns button.active{background:var(--teal);color:#fff;border-color:var(--teal);}
+
+  .rate-out{
+    display:flex;justify-content:space-between;align-items:baseline;
+    background:linear-gradient(135deg,#FBF3DC,#F6EBC7);
+    border:1px solid #E9D9A0;border-radius:10px;
+    padding:12px 14px;margin-top:12px;
+  }
+  .rate-out .lbl{font-size:12px;color:#7A5F1E;font-weight:600;}
+  .rate-out .val{font-size:19px;font-weight:800;color:#7A5F1E;font-variant-numeric:tabular-nums;}
+
+  .divider{display:flex;align-items:center;gap:8px;margin:2px 0 14px;color:var(--muted);font-size:11px;}
+  .divider::before,.divider::after{content:"";flex:1;height:1px;background:var(--line);}
+
+  .result-card{background:var(--teal-deep);border-radius:16px;padding:17px 17px 19px;color:#fff;margin-top:4px;}
+  .result-card .card-title{color:var(--gold);}
+  .result-card .card-title .n{background:var(--gold);color:var(--teal-deep);}
+  .result-row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid rgba(255,255,255,0.12);}
+  .result-row:last-of-type{border-bottom:none;}
+  .result-row .r-lbl{font-size:12.5px;color:rgba(255,255,255,0.72);}
+  .result-row .r-val{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;}
+  .result-row.hero{background:rgba(255,255,255,0.08);border-radius:10px;padding:13px;margin:8px 0 4px;border-bottom:none;flex-direction:column;align-items:flex-start;gap:2px;}
+  .result-row.hero .r-lbl{color:var(--gold);font-weight:700;font-size:11.5px;letter-spacing:.04em;text-transform:uppercase;}
+  .result-row.hero .r-val{font-size:24px;color:#fff;}
+  .margin-tag{font-size:11px;color:#8FE0C8;background:rgba(31,122,77,0.25);padding:3px 8px;border-radius:20px;margin-top:6px;display:inline-block;}
+  .margin-tag.gold{background:rgba(199,154,62,0.18);color:#7A5F1E;}
+  .margin-tag.warn{color:var(--warn-text);background:var(--warn-bg);font-weight:700;}
+  .margin-tag.warn::before{content:"⚠️ ";}
+
+  .theme-toggle{
+    position:absolute;top:18px;right:16px;
+    width:34px;height:34px;border-radius:50%;
+    background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.25);
+    color:#fff;font-size:15px;display:flex;align-items:center;justify-content:center;
+    -webkit-tap-highlight-color:transparent;cursor:pointer;
+  }
+
+  .day-summary{
+    display:flex;justify-content:space-between;align-items:center;
+    background:var(--input-unit-bg);border:1px solid var(--line);border-radius:10px;
+    padding:9px 12px;margin-bottom:10px;font-size:12px;color:var(--muted);
+  }
+  .day-summary b{color:var(--teal-deep);font-size:13px;}
+  .day-summary .gain{color:#1F7A4D;font-weight:700;}
+
+  .hist-search{margin-bottom:10px;}
+  .hist-search .input-row{background:var(--input-bg);}
+
+  .resumen-filtros{display:flex;gap:8px;margin-bottom:10px;}
+  .resumen-filtros select{
+    flex:1;padding:8px 10px;border-radius:9px;border:1.5px solid var(--line);
+    background:var(--input-bg);color:var(--ink);font-size:12px;font-weight:600;
+    -webkit-tap-highlight-color:transparent;
+  }
+
+  .btn-primary{
+    width:100%;padding:13px;border-radius:10px;border:none;
+    background:var(--gold);color:var(--teal-deep);font-weight:700;font-size:14.5px;
+    margin-top:14px;-webkit-tap-highlight-color:transparent;
+  }
+  .btn-secondary{
+    width:100%;padding:11px;border-radius:10px;border:1.5px solid var(--line);
+    background:var(--btn-bg);color:var(--teal-deep);font-weight:600;font-size:13px;
+    margin-top:8px;-webkit-tap-highlight-color:transparent;
+  }
+
+  /* Historial */
+  .hist-item{
+    border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;
+    background:var(--input-bg);font-size:12.5px;
+  }
+  .hist-item .hist-top{display:flex;justify-content:space-between;font-weight:700;color:var(--teal-deep);margin-bottom:3px;}
+  .hist-item .hist-route{color:var(--teal);font-size:11.5px;margin-bottom:4px;}
+  .hist-item .hist-detail{color:var(--muted);font-size:11.5px;line-height:1.5;}
+  .hist-item .hist-gain{color:#1F7A4D;font-weight:700;}
+  .hist-empty{text-align:center;color:var(--muted);font-size:12.5px;padding:18px 10px;}
+  .del-btn{background:none;border:none;color:#B23A3A;font-size:11px;font-weight:600;padding:0;margin-top:6px;-webkit-tap-highlight-color:transparent;}
+
+  .modal-bg{
+    display:none;position:fixed;inset:0;background:rgba(10,30,28,0.55);
+    align-items:flex-end;justify-content:center;z-index:50;
+  }
+  .modal-bg.show{display:flex;}
+  .modal{
+    background:var(--panel);width:100%;max-width:480px;border-radius:18px 18px 0 0;
+    padding:20px 18px 26px;max-height:85vh;overflow-y:auto;
+  }
+  .modal h3{margin:0 0 14px;color:var(--teal-deep);font-size:16px;}
+  .modal .close-x{float:right;font-size:20px;color:var(--muted);background:none;border:none;-webkit-tap-highlight-color:transparent;}
+
+  .toast{
+    position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+    background:var(--teal-deep);color:#fff;padding:10px 18px;border-radius:20px;
+    font-size:13px;box-shadow:0 4px 14px rgba(0,0,0,0.25);z-index:60;opacity:0;transition:opacity .25s;
+    pointer-events:none;
+  }
+  .toast.show{opacity:1;}
+
+  .footer-note{text-align:center;font-size:11px;color:var(--muted);padding:10px 26px 0;line-height:1.5;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <img class="logo" src="data:image/png;base64,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" alt="VALIA">
+    <div class="sub">Tasa del día</div>
+    <div class="date-pill" id="today"></div>
+    <div class="operador-pill" id="operadorPill">👤 <span id="operadorNombre">Configurar operador</span></div>
+    <button class="theme-toggle" id="themeToggle" title="Cambiar tema">🌙</button>
+  </header>
+
+  <section>
+    <!-- Selector de ruta -->
+    <div class="card">
+      <p class="card-title"><span class="n">1</span>Elige la ruta</p>
+      <div class="country-list" id="countryList"></div>
+    </div>
+
+    <!-- Tasas de mercado -->
+    <div class="card">
+      <p class="card-title"><span class="n">2</span>Tasas de mercado (hoy)</p>
+      <div class="field">
+        <label id="lblCompra">Tasa compra USDT</label>
+        <div class="input-row">
+          <span class="unit" id="unitCompra">—</span>
+          <input type="number" id="tasaCompra" inputmode="decimal" placeholder="0">
+        </div>
+      </div>
+      <div class="field">
+        <label id="lblVenta">Tasa venta USDT</label>
+        <div class="input-row">
+          <span class="unit" id="unitVenta">—</span>
+          <input type="number" id="tasaVenta" inputmode="decimal" placeholder="0">
+        </div>
+      </div>
+      <div class="field" id="comisionField">
+        <label id="lblComision">Comisión exchange (%)</label>
+        <div class="input-row">
+          <span class="unit">%</span>
+          <input type="number" id="comisionExchange" inputmode="decimal" placeholder="0">
+        </div>
+      </div>
+      <div class="rate-out">
+        <span class="lbl">Tasa de mercado (sin margen)</span>
+        <span class="val" id="tasaMercado">—</span>
+      </div>
+    </div>
+
+    <!-- Margen -->
+    <div class="card">
+      <p class="card-title"><span class="n">3</span>Tu margen de hoy</p>
+      <div class="margin-btns" id="marginBtns">
+        <button data-m="3">3%</button>
+        <button data-m="4">4%</button>
+        <button data-m="5" class="active">5%</button>
+        <button data-m="7">7%</button>
+      </div>
+      <div class="field" style="margin-top:12px;">
+        <label>Margen personalizado</label>
+        <div class="input-row">
+          <span class="unit">%</span>
+          <input type="number" id="margenCustom" inputmode="decimal" placeholder="5">
+        </div>
+      </div>
+
+      <div class="field" style="margin-top:14px;">
+        <label id="lblTasaPublicada">Tasa a publicar hoy (editable)</label>
+        <div class="input-row" style="border-color:#E9D9A0;background:linear-gradient(135deg,#FBF3DC,#F6EBC7);">
+          <input type="number" id="tasaPublicada" inputmode="decimal" step="any" placeholder="0" style="font-weight:800;font-size:18px;color:#7A5F1E;">
+        </div>
+      </div>
+      <span class="margin-tag gold" id="margenEfectivo">Margen con esta tasa: —</span>
+    </div>
+
+    <!-- Operacion -->
+    <div class="card">
+      <p class="card-title"><span class="n">4</span>Monto de la operación</p>
+      <div class="margin-btns" id="modoBtns" style="margin-bottom:12px;">
+        <button data-modo="A" class="active">Cliente envía</button>
+        <button data-modo="B">Quiere que reciba exacto</button>
+      </div>
+      <div class="field">
+        <label id="lblMonto">Monto que envía el cliente</label>
+        <div class="input-row">
+          <span class="unit" id="unitMonto">—</span>
+          <input type="number" id="montoOrigen" inputmode="decimal" placeholder="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="divider">RESULTADO</div>
+
+    <div class="result-card">
+      <p class="card-title"><span class="n">✓</span>Resumen de la operación</p>
+      <div class="result-row hero">
+        <span class="r-lbl" id="lblResultado1">Beneficiario recibe</span>
+        <span class="r-val" id="valResultado1">—</span>
+      </div>
+      <div class="result-row" style="padding-top:2px;">
+        <span class="r-lbl" id="lblResultado2">Cliente envía</span>
+        <span class="r-val" id="valResultado2" style="font-size:14px;">—</span>
+      </div>
+      <div class="result-row">
+        <span class="r-lbl">USDT comprados (total)</span>
+        <span class="r-val" id="usdtComprados">—</span>
+      </div>
+      <div class="result-row">
+        <span class="r-lbl">USDT usados para pagar</span>
+        <span class="r-val" id="usdtUsados">—</span>
+      </div>
+      <div class="result-row">
+        <span class="r-lbl">Tu ganancia</span>
+        <span class="r-val" id="gananciaUSDT">—</span>
+      </div>
+      <span class="margin-tag" id="margenReal">Margen real: —</span>
+
+      <button class="btn-secondary" id="btnCopiarCotizacion" style="background:rgba(255,255,255,0.1);border-color:rgba(255,255,255,0.25);color:#fff;">📲 Copiar cotización para WhatsApp</button>
+      <button class="btn-primary" id="btnRegistrar">📝 Registrar esta operación</button>
+    </div>
+
+    <!-- Historial -->
+    <div class="card" style="margin-top:14px;">
+      <p class="card-title"><span class="n">📋</span>Historial (local)</p>
+      <div class="resumen-filtros">
+        <select id="resumenPeriodo">
+          <option value="hoy">Hoy</option>
+          <option value="semana">Esta semana</option>
+          <option value="mes">Este mes</option>
+          <option value="todo">Todo</option>
+        </select>
+        <select id="resumenPais">
+          <option value="todos">Todos los países</option>
+        </select>
+      </div>
+      <div class="day-summary" id="daySummary">Hoy: 0 operaciones · 0 USDT</div>
+      <div class="hist-search">
+        <div class="input-row">
+          <input type="text" id="histSearch" placeholder="Buscar por nombre o ID...">
+        </div>
+      </div>
+      <div id="histList"><div class="hist-empty">Aún no has registrado operaciones.</div></div>
+      <button class="btn-secondary" id="btnCopiar">📋 Copiar todo para pegar en Excel</button>
+      <button class="btn-secondary" id="btnLimpiar" style="color:#B23A3A;border-color:#E7C9C9;">🗑️ Borrar historial local</button>
+    </div>
+
+    <p class="footer-note">El historial se guarda en este teléfono únicamente, y no se borra solo — queda ahí hasta que tú decidas borrarlo. Cada operador usa su propia copia y su nombre; al copiar, cada fila incluye quién la registró.</p>
+  </section>
+</div>
+
+<!-- Modal registrar -->
+<div class="modal-bg" id="modalBg">
+  <div class="modal">
+    <button class="close-x" id="closeModal">×</button>
+    <h3>Registrar operación</h3>
+    <div class="field">
+      <label>Fecha de la operación</label>
+      <div class="input-row"><input type="date" id="regFecha"></div>
+    </div>
+    <div class="field">
+      <label>ID Cliente (el mismo del Excel, si lo sabes)</label>
+      <div class="input-row"><input type="text" id="regId" list="clientesIdList" placeholder="Ej. 14297127"></div>
+      <datalist id="clientesIdList"></datalist>
+    </div>
+    <div class="field">
+      <label>Nombre del cliente</label>
+      <div class="input-row"><input type="text" id="regNombre" list="clientesNombreList" placeholder="Nombre y apellido"></div>
+      <datalist id="clientesNombreList"></datalist>
+    </div>
+    <div class="field">
+      <label>Referido por (ID, opcional)</label>
+      <div class="input-row"><input type="text" id="regReferido" placeholder="Opcional"></div>
+    </div>
+    <div class="field">
+      <label>Notas (opcional)</label>
+      <div class="input-row"><input type="text" id="regNotas" placeholder="Opcional"></div>
+    </div>
+    <button class="btn-primary" id="btnGuardarReg">Guardar operación</button>
+  </div>
+</div>
+
+<!-- Modal operador -->
+<div class="modal-bg" id="modalOperadorBg">
+  <div class="modal">
+    <button class="close-x" id="closeModalOperador">×</button>
+    <h3>¿Quién está operando?</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-8px;">Este nombre se guarda en este teléfono y se incluye en cada operación que copies, para identificar quién la registró cuando junten los datos de varios operadores.</p>
+    <div class="field">
+      <label>Tu nombre</label>
+      <div class="input-row"><input type="text" id="operadorInput" placeholder="Ej. Deiber, Corresponsal 1..."></div>
+    </div>
+    <button class="btn-primary" id="btnGuardarOperador">Guardar</button>
+  </div>
+</div>
+
+<!-- Modal confirmacion generica -->
+<div class="modal-bg" id="modalConfirmBg">
+  <div class="modal" style="padding-bottom:20px;">
+    <h3 id="confirmTitulo">¿Confirmar?</h3>
+    <p id="confirmTexto" style="font-size:13px;color:var(--muted);margin-top:-6px;"></p>
+    <div style="display:flex;gap:10px;margin-top:14px;">
+      <button class="btn-secondary" id="btnConfirmCancelar" style="margin-top:0;">Cancelar</button>
+      <button class="btn-primary" id="btnConfirmAceptar" style="margin-top:0;background:#B23A3A;color:#fff;">Sí, eliminar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (n, d=2) => isFinite(n) ? n.toLocaleString('es-CL', {minimumFractionDigits:d, maximumFractionDigits:d}) : '—';
+
+// comisionAplicaA indica sobre que lado de la operacion pesa la comision del
+// exchange/corresponsal: 'compra' si se paga al comprar USDT en el pais de
+// origen, 'venta' si se paga al vender USDT en el pais de destino, o null si
+// esta ruta no pasa por un corresponsal con comision.
+const RUTAS = {
+  CL_VE: {
+    label: "Chile → Venezuela", short: "CL → VE",
+    monedaOrigen: "CLP", monedaDestino: "Bs",
+    paisOrigen: "Chile", paisDestino: "Venezuela",
+    flagOrigen: "🇨🇱", flagDestino: "🇻🇪",
+    defCompra: 950, defVenta: 890,
+    comisionAplicaA: null, defComision: 0
+  },
+  VE_CL: {
+    label: "Venezuela → Chile", short: "VE → CL",
+    monedaOrigen: "Bs", monedaDestino: "CLP",
+    paisOrigen: "Venezuela", paisDestino: "Chile",
+    flagOrigen: "🇻🇪", flagDestino: "🇨🇱",
+    defCompra: 890, defVenta: 950,
+    comisionAplicaA: null, defComision: 0
+  },
+  CL_PE: {
+    label: "Chile → Perú", short: "CL → PE",
+    monedaOrigen: "CLP", monedaDestino: "PEN",
+    paisOrigen: "Chile", paisDestino: "Perú",
+    flagOrigen: "🇨🇱", flagDestino: "🇵🇪",
+    defCompra: 950, defVenta: 3.44,
+    comisionAplicaA: null, defComision: 0
+  },
+  PE_VE: {
+    label: "Perú → Venezuela", short: "PE → VE",
+    monedaOrigen: "PEN", monedaDestino: "Bs",
+    paisOrigen: "Perú", paisDestino: "Venezuela",
+    flagOrigen: "🇵🇪", flagDestino: "🇻🇪",
+    defCompra: 3.44, defVenta: 890,
+    comisionAplicaA: null, defComision: 0
+  },
+  VE_PE: {
+    label: "Venezuela → Perú", short: "VE → PE",
+    monedaOrigen: "Bs", monedaDestino: "PEN",
+    paisOrigen: "Venezuela", paisDestino: "Perú",
+    flagOrigen: "🇻🇪", flagDestino: "🇵🇪",
+    defCompra: 890, defVenta: 3.44,
+    comisionAplicaA: null, defComision: 0
+  },
+  CO_VE: {
+    label: "Colombia → Venezuela", short: "CO → VE",
+    monedaOrigen: "COP", monedaDestino: "Bs",
+    paisOrigen: "Colombia", paisDestino: "Venezuela",
+    flagOrigen: "🇨🇴", flagDestino: "🇻🇪",
+    defCompra: 3200, defVenta: 830,
+    comisionAplicaA: 'compra', defComision: 4, nueva: true
+  },
+  VE_CO: {
+    label: "Venezuela → Colombia", short: "VE → CO",
+    monedaOrigen: "Bs", monedaDestino: "COP",
+    paisOrigen: "Venezuela", paisDestino: "Colombia",
+    flagOrigen: "🇻🇪", flagDestino: "🇨🇴",
+    defCompra: 830, defVenta: 3200,
+    comisionAplicaA: 'venta', defComision: 4, nueva: true
+  },
+  CO_CL: {
+    label: "Colombia → Chile", short: "CO → CL",
+    monedaOrigen: "COP", monedaDestino: "CLP",
+    paisOrigen: "Colombia", paisDestino: "Chile",
+    flagOrigen: "🇨🇴", flagDestino: "🇨🇱",
+    defCompra: 3200, defVenta: 920,
+    comisionAplicaA: 'compra', defComision: 4, nueva: true
+  },
+  CL_CO: {
+    label: "Chile → Colombia", short: "CL → CO",
+    monedaOrigen: "CLP", monedaDestino: "COP",
+    paisOrigen: "Chile", paisDestino: "Colombia",
+    flagOrigen: "🇨🇱", flagDestino: "🇨🇴",
+    defCompra: 920, defVenta: 3200,
+    comisionAplicaA: 'venta', defComision: 4, nueva: true
+  },
+  CO_PE: {
+    label: "Colombia → Perú", short: "CO → PE",
+    monedaOrigen: "COP", monedaDestino: "PEN",
+    paisOrigen: "Colombia", paisDestino: "Perú",
+    flagOrigen: "🇨🇴", flagDestino: "🇵🇪",
+    defCompra: 3200, defVenta: 3.36,
+    comisionAplicaA: 'compra', defComision: 4, nueva: true
+  },
+  PE_CO: {
+    label: "Perú → Colombia", short: "PE → CO",
+    monedaOrigen: "PEN", monedaDestino: "COP",
+    paisOrigen: "Perú", paisDestino: "Colombia",
+    flagOrigen: "🇵🇪", flagDestino: "🇨🇴",
+    defCompra: 3.36, defVenta: 3200,
+    comisionAplicaA: 'venta', defComision: 4, nueva: true
+  }
+};
+
+// Paises "hub" para la navegacion, derivados automaticamente de RUTAS.
+// Agregar un pais nuevo en el futuro solo requiere agregar sus rutas arriba;
+// no hay que tocar esta lista ni la logica de construccion del menu.
+function paisesDesdeRutas(){
+  const set = new Set();
+  Object.values(RUTAS).forEach(r => { set.add(r.paisOrigen); set.add(r.paisDestino); });
+  return Array.from(set).sort();
+}
+function rutasDePais(pais){
+  return Object.keys(RUTAS).filter(k => RUTAS[k].paisOrigen === pais || RUTAS[k].paisDestino === pais);
+}
+const FLAG_PAIS = {};
+Object.values(RUTAS).forEach(r => { FLAG_PAIS[r.paisOrigen] = r.flagOrigen; FLAG_PAIS[r.paisDestino] = r.flagDestino; });
+
+let rutaActual = "CL_VE";
+let modoActual = 'A'; // A: cliente envía X -> cuanto recibe. B: quiero que reciba exacto Y -> cuanto cobro.
+let selectedMargin = 5;
+let ultimoResultado = null;
+
+// Cada ruta guarda sus propios valores por separado (tasas, margen, monto, tasa publicada),
+// para que escribir en una ruta no afecte a las demas.
+function crearDatosPorDefecto(){
+  const obj = {};
+  Object.keys(RUTAS).forEach(key=>{
+    obj[key] = {
+      tasaCompra: RUTAS[key].defCompra,
+      tasaVenta: RUTAS[key].defVenta,
+      compraTouched: false,
+      ventaTouched: false,
+      comisionExchange: RUTAS[key].defComision || 0,
+      margenCustom: '',
+      selectedMargin: 5,
+      montoOrigen: '',
+      tasaPublicada: '',
+      tasaPublicadaTouched: false
+    };
+  });
+  return obj;
+}
+let datosPorRuta = crearDatosPorDefecto();
+
+function guardarEstadoEnMemoria(key){
+  datosPorRuta[key] = {
+    tasaCompra: $('tasaCompra').value,
+    tasaVenta: $('tasaVenta').value,
+    compraTouched: !!$('tasaCompra').dataset.touched,
+    ventaTouched: !!$('tasaVenta').dataset.touched,
+    comisionExchange: $('comisionExchange').value,
+    margenCustom: $('margenCustom').value,
+    selectedMargin: selectedMargin,
+    montoOrigen: $('montoOrigen').value,
+    tasaPublicada: $('tasaPublicada').value,
+    tasaPublicadaTouched: !!$('tasaPublicada').dataset.touched
+  };
+}
+
+function cargarEstadoDesdeMemoria(key){
+  const d = datosPorRuta[key];
+  $('tasaCompra').value = d.tasaCompra;
+  $('tasaCompra').dataset.touched = d.compraTouched ? '1' : '';
+  $('tasaVenta').value = d.tasaVenta;
+  $('tasaVenta').dataset.touched = d.ventaTouched ? '1' : '';
+  $('comisionExchange').value = (d.comisionExchange === undefined || d.comisionExchange === '') ? (RUTAS[key].defComision || 0) : d.comisionExchange;
+  $('margenCustom').value = d.margenCustom;
+  selectedMargin = d.selectedMargin;
+  $('montoOrigen').value = d.montoOrigen;
+  $('tasaPublicada').value = d.tasaPublicada;
+  $('tasaPublicada').dataset.touched = d.tasaPublicadaTouched ? '1' : '';
+  document.querySelectorAll('#marginBtns button').forEach(b=>{
+    b.classList.toggle('active', !d.tasaPublicadaTouched && parseFloat(b.dataset.m) === selectedMargin);
+  });
+}
+
+$('today').textContent = new Date().toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+
+// Construir el selector agrupado por pais: un boton por pais que despliega
+// solo las rutas de ese pais. Los paises y sus rutas salen de RUTAS, asi que
+// agregar un pais nuevo no requiere tocar este bloque.
+const countryListEl = $('countryList');
+const paises = paisesDesdeRutas();
+
+function seleccionarRuta(key, btn){
+  guardarEstadoEnMemoria(rutaActual); // conserva lo que habia en la ruta que se deja
+  rutaActual = key;
+  document.querySelectorAll('.route-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  aplicarRuta(); // aplica etiquetas y carga los valores propios de la nueva ruta
+  recalc();
+  save();
+}
+
+function construirRouteBtn(key){
+  const r = RUTAS[key];
+  const btn = document.createElement('button');
+  btn.className = 'route-btn' + (key === rutaActual ? ' active' : '');
+  btn.dataset.ruta = key;
+  btn.innerHTML = r.label.replace(' → ', '<small>→</small>').split('<small>→</small>')[0] + '<small>→ ' + r.label.split(' → ')[1] + '</small>'
+    + (r.nueva ? '<span class="badge-nueva">Nueva</span>' : '');
+  btn.addEventListener('click', () => seleccionarRuta(key, btn));
+  return btn;
+}
+
+paises.forEach(pais => {
+  const rutasPais = rutasDePais(pais);
+  const wrap = document.createElement('div');
+
+  const header = document.createElement('button');
+  header.className = 'country-btn';
+  header.dataset.pais = pais;
+  header.innerHTML = `<span><span class="flag">${FLAG_PAIS[pais] || ''}</span>${pais}<span class="country-count">${rutasPais.length} ${rutasPais.length===1?'ruta':'rutas'}</span></span><span class="country-chevron">▼</span>`;
+
+  const routesWrap = document.createElement('div');
+  routesWrap.className = 'country-routes';
+  const routesGrid = document.createElement('div');
+  routesGrid.className = 'route-grid';
+  rutasPais.forEach(key => routesGrid.appendChild(construirRouteBtn(key)));
+  routesWrap.appendChild(routesGrid);
+
+  header.addEventListener('click', () => {
+    const isOpen = header.classList.contains('open');
+    document.querySelectorAll('.country-btn').forEach(b => b.classList.remove('open'));
+    document.querySelectorAll('.country-routes').forEach(w => w.classList.remove('open'));
+    if (!isOpen){
+      header.classList.add('open');
+      routesWrap.classList.add('open');
+    }
+  });
+
+  wrap.appendChild(header);
+  wrap.appendChild(routesWrap);
+  countryListEl.appendChild(wrap);
+});
+
+// Abrir automaticamente el pais de la ruta activa al cargar
+function abrirPaisDeRutaActual(){
+  const pais = RUTAS[rutaActual].paisOrigen;
+  const header = document.querySelector(`.country-btn[data-pais="${pais}"]`);
+  if (header) header.click();
+}
+
+function aplicarRuta(){
+  const r = RUTAS[rutaActual];
+  $('lblCompra').textContent = `Tasa compra USDT (${r.monedaOrigen} por 1 USDT)`;
+  $('unitCompra').textContent = r.monedaOrigen;
+  $('lblVenta').textContent = `Tasa venta USDT (${r.monedaDestino} por 1 USDT)`;
+  $('unitVenta').textContent = r.monedaDestino;
+  $('lblTasaPublicada').textContent = `Tasa a publicar (${r.monedaDestino}/${r.monedaOrigen})`;
+  if (r.comisionAplicaA === 'compra'){
+    $('lblComision').textContent = `Comisión exchange al comprar USDT en ${r.paisOrigen} (%)`;
+    $('comisionField').style.display = '';
+  } else if (r.comisionAplicaA === 'venta'){
+    $('lblComision').textContent = `Comisión exchange al vender USDT en ${r.paisDestino} (%)`;
+    $('comisionField').style.display = '';
+  } else {
+    $('lblComision').textContent = 'Comisión exchange (%)';
+    $('comisionField').style.display = 'none';
+  }
+  actualizarEtiquetasMonto();
+  cargarEstadoDesdeMemoria(rutaActual);
+}
+
+function actualizarEtiquetasMonto(){
+  const r = RUTAS[rutaActual];
+  if (modoActual === 'A'){
+    $('lblMonto').textContent = 'Monto que envía el cliente';
+    $('unitMonto').textContent = r.monedaOrigen;
+  } else {
+    $('lblMonto').textContent = 'Monto exacto que debe recibir el beneficiario';
+    $('unitMonto').textContent = r.monedaDestino;
+  }
+}
+
+function roundSmart(v){
+  // redondeo con mas decimales para numeros chicos, menos para numeros grandes
+  if (!isFinite(v)) return 0;
+  const abs = Math.abs(v);
+  let dec = 6;
+  if (abs >= 100) dec = 2;
+  else if (abs >= 10) dec = 3;
+  else if (abs >= 1) dec = 4;
+  return parseFloat(v.toFixed(dec));
+}
+
+const UMBRAL_MARGEN_BAJO = 4; // %
+
+function recalc(opts = {}){
+  const r = RUTAS[rutaActual];
+  const tc = parseFloat($('tasaCompra').value) || 0;
+  const tv = parseFloat($('tasaVenta').value) || 0;
+  const margen = parseFloat($('margenCustom').value);
+  const monto = parseFloat($('montoOrigen').value) || 0;
+  const m = (!isNaN(margen) ? margen : selectedMargin) / 100;
+
+  // La comision del exchange/corresponsal se resta siempre desde el lado que
+  // le corresponda: al comprar USDT (si es la punta de origen) o al vender
+  // USDT (si es la punta de destino). En rutas sin corresponsal, ambas quedan en 0.
+  const comisionPct = (parseFloat($('comisionExchange').value) || 0) / 100;
+  const comisionCompra = r.comisionAplicaA === 'compra' ? comisionPct : 0;
+  const comisionVenta = r.comisionAplicaA === 'venta' ? comisionPct : 0;
+
+  const tasaMercado = tc > 0 ? (1 - comisionCompra) * (1 - comisionVenta) * tv / tc : 0;
+  $('tasaMercado').textContent = tasaMercado ? fmt(tasaMercado, 6) : '—';
+
+  // Si el usuario NO ha editado la tasa publicada a mano, se sigue calculando desde el margen.
+  // Si la edito a mano (o si venimos de tocar un boton de margen, que la "resetea"), se respeta su valor.
+  if (!$('tasaPublicada').dataset.touched || opts.fromMargen){
+    const sugerida = tasaMercado * (1 - m);
+    $('tasaPublicada').value = tasaMercado ? roundSmart(sugerida) : '';
+    $('tasaPublicada').dataset.touched = '';
+  }
+
+  const tasaPublicada = parseFloat($('tasaPublicada').value) || 0;
+
+  // Margen efectivo con la tasa publicada actual (haya sido calculada o editada a mano)
+  const margenEfectivo = tasaMercado > 0 ? (1 - (tasaPublicada / tasaMercado)) * 100 : 0;
+  const elMargenEf = $('margenEfectivo');
+  elMargenEf.textContent = tasaMercado ? `Margen con esta tasa: ${fmt(margenEfectivo,2)}%` : 'Margen con esta tasa: —';
+  elMargenEf.classList.toggle('warn', tasaMercado > 0 && margenEfectivo < UMBRAL_MARGEN_BAJO);
+
+  if (monto > 0 && tc > 0 && tv > 0 && tasaPublicada > 0){
+    let montoOrigenFinal, montoDestinoFinal;
+    if (modoActual === 'A'){
+      montoOrigenFinal = monto;
+      montoDestinoFinal = monto * tasaPublicada;
+    } else {
+      montoDestinoFinal = monto; // lo que el usuario quiere que reciba exacto
+      montoOrigenFinal = monto / tasaPublicada; // lo que hay que cobrarle al cliente
+    }
+
+    const usdtComprados = (montoOrigenFinal / tc) * (1 - comisionCompra);
+    const usdtUsados = montoDestinoFinal / (tv * (1 - comisionVenta));
+    const ganancia = usdtComprados - usdtUsados;
+    const margenReal = montoOrigenFinal > 0 ? (ganancia * tc) / montoOrigenFinal * 100 : 0;
+
+    if (modoActual === 'A'){
+      $('lblResultado1').textContent = `Beneficiario recibe (${r.monedaDestino})`;
+      $('valResultado1').textContent = fmt(montoDestinoFinal, 2) + ' ' + r.monedaDestino;
+      $('lblResultado2').textContent = `Cliente envía (${r.monedaOrigen})`;
+      $('valResultado2').textContent = fmt(montoOrigenFinal, 2) + ' ' + r.monedaOrigen;
+    } else {
+      $('lblResultado1').textContent = `Debes cobrarle al cliente (${r.monedaOrigen})`;
+      $('valResultado1').textContent = fmt(montoOrigenFinal, 2) + ' ' + r.monedaOrigen;
+      $('lblResultado2').textContent = `Beneficiario recibe exacto (${r.monedaDestino})`;
+      $('valResultado2').textContent = fmt(montoDestinoFinal, 2) + ' ' + r.monedaDestino;
+    }
+
+    $('usdtComprados').textContent = fmt(usdtComprados, 4) + ' USDT';
+    $('usdtUsados').textContent = fmt(usdtUsados, 4) + ' USDT';
+    $('gananciaUSDT').textContent = fmt(ganancia, 4) + ' USDT';
+    const elMargenReal = $('margenReal');
+    const bajoMargen = margenReal < UMBRAL_MARGEN_BAJO;
+    elMargenReal.textContent = (bajoMargen ? 'Margen bajo: ' : 'Margen real: ') + fmt(margenReal, 2) + '%';
+    elMargenReal.classList.toggle('warn', bajoMargen);
+
+    ultimoResultado = {
+      ruta: r.label, monedaOrigen: r.monedaOrigen, monedaDestino: r.monedaDestino,
+      paisOrigen: r.paisOrigen, paisDestino: r.paisDestino, flagOrigen: r.flagOrigen, flagDestino: r.flagDestino,
+      monto: montoOrigenFinal, montoDestino: montoDestinoFinal, tasaPublicada, tasaCompra: tc, tasaVenta: tv,
+      usdtComprados, ganancia, margenReal, montoPagar: montoDestinoFinal
+    };
+  } else {
+    $('valResultado1').textContent = '—';
+    $('valResultado2').textContent = '—';
+    $('usdtComprados').textContent = '—';
+    $('usdtUsados').textContent = '—';
+    $('gananciaUSDT').textContent = '—';
+    const elMargenReal = $('margenReal');
+    elMargenReal.textContent = 'Margen real: —';
+    elMargenReal.classList.remove('warn');
+    ultimoResultado = null;
+  }
+}
+
+document.querySelectorAll('#marginBtns button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#marginBtns button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedMargin = parseFloat(btn.dataset.m);
+    $('margenCustom').value = '';
+    $('tasaPublicada').dataset.touched = ''; // al elegir un margen, la tasa vuelve a calcularse sola
+    recalc({fromMargen:true});
+    guardarEstadoEnMemoria(rutaActual);
+    save();
+  });
+});
+
+['tasaCompra','tasaVenta','comisionExchange','margenCustom','montoOrigen'].forEach(id=>{
+  $(id).addEventListener('input', ()=>{
+    if (id==='tasaCompra' || id==='tasaVenta') $(id).dataset.touched = '1';
+    if (id==='margenCustom') $('tasaPublicada').dataset.touched = ''; // escribir margen manual tambien recalcula la tasa
+    recalc();
+    guardarEstadoEnMemoria(rutaActual);
+    save();
+  });
+});
+
+$('tasaPublicada').addEventListener('input', ()=>{
+  $('tasaPublicada').dataset.touched = '1';
+  document.querySelectorAll('#marginBtns button').forEach(b=>b.classList.remove('active'));
+  recalc();
+  guardarEstadoEnMemoria(rutaActual);
+  save();
+});
+
+document.querySelectorAll('#modoBtns button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#modoBtns button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    modoActual = btn.dataset.modo;
+    $('montoOrigen').value = ''; // limpiar para evitar confundir un monto con otro al cambiar de modo
+    actualizarEtiquetasMonto();
+    recalc();
+    save();
+  });
+});
+
+function showToast(msg){
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(()=> t.classList.remove('show'), 2200);
+}
+
+// ===== Registro de operaciones =====
+function todayYYYYMMDD(){
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+function yyyymmddADisplay(v){
+  if (!v) return new Date().toLocaleDateString('es-CL', {day:'2-digit',month:'2-digit',year:'numeric'});
+  const [y,m,d] = v.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function actualizarDatalistClientes(){
+  const hist = loadHistorial();
+  const vistosId = new Set();
+  const vistosNombre = new Set();
+  const idList = $('clientesIdList');
+  const nombreList = $('clientesNombreList');
+  idList.innerHTML = '';
+  nombreList.innerHTML = '';
+  hist.forEach(h=>{
+    if (h.id && !vistosId.has(h.id)){
+      vistosId.add(h.id);
+      const opt = document.createElement('option');
+      opt.value = h.id;
+      idList.appendChild(opt);
+    }
+    if (h.nombre && !vistosNombre.has(h.nombre)){
+      vistosNombre.add(h.nombre);
+      const opt = document.createElement('option');
+      opt.value = h.nombre;
+      nombreList.appendChild(opt);
+    }
+  });
+}
+
+function buscarIdPorNombre(nombre){
+  const hist = loadHistorial();
+  const found = hist.find(h => h.nombre && h.nombre.toLowerCase() === nombre.toLowerCase());
+  return found ? found.id : '';
+}
+
+$('btnRegistrar').addEventListener('click', ()=>{
+  if (!ultimoResultado){ showToast('Completa monto y tasas primero'); return; }
+  $('regFecha').value = todayYYYYMMDD();
+  actualizarDatalistClientes();
+  $('modalBg').classList.add('show');
+});
+$('closeModal').addEventListener('click', ()=> $('modalBg').classList.remove('show'));
+
+$('regNombre').addEventListener('change', ()=>{
+  if (!$('regId').value.trim()){
+    const id = buscarIdPorNombre($('regNombre').value.trim());
+    if (id) $('regId').value = id;
+  }
+});
+
+$('btnGuardarReg').addEventListener('click', ()=>{
+  if (!ultimoResultado) return;
+  const entry = {
+    fecha: yyyymmddADisplay($('regFecha').value),
+    isoFecha: $('regFecha').value || todayYYYYMMDD(),
+    operador: loadOperador(),
+    id: $('regId').value.trim(),
+    nombre: $('regNombre').value.trim(),
+    ruta: ultimoResultado.ruta,
+    paisOrigen: ultimoResultado.paisOrigen,
+    paisDestino: ultimoResultado.paisDestino,
+    monto: ultimoResultado.monto,
+    montoDestino: ultimoResultado.montoDestino,
+    monedaOrigen: ultimoResultado.monedaOrigen,
+    monedaDestino: ultimoResultado.monedaDestino,
+    tasaAplicada: ultimoResultado.tasaPublicada,
+    ganancia: ultimoResultado.ganancia,
+    usdtMovido: ultimoResultado.usdtComprados,
+    referido: $('regReferido').value.trim(),
+    notas: $('regNotas').value.trim(),
+    tasaCompra: ultimoResultado.tasaCompra,
+    tasaVenta: ultimoResultado.tasaVenta,
+    margenReal: ultimoResultado.margenReal
+  };
+  const hist = loadHistorial();
+  hist.unshift(entry);
+  saveHistorial(hist);
+  renderHistorial(hist);
+  actualizarDatalistClientes();
+  $('modalBg').classList.remove('show');
+  $('regId').value=''; $('regNombre').value=''; $('regReferido').value=''; $('regNotas').value='';
+  showToast('Operación registrada ✓');
+});
+
+// Convierte isoFecha (YYYY-MM-DD) a Date local a medianoche, para comparar por dia/semana/mes
+// sin problemas de zona horaria.
+function isoADate(iso){
+  if (!iso) return null;
+  const [y,m,d] = iso.split('-').map(Number);
+  return new Date(y, (m||1)-1, d||1);
+}
+function inicioDeSemana(d){
+  const dia = d.getDay(); // 0=domingo
+  const res = new Date(d);
+  res.setDate(d.getDate() - dia);
+  res.setHours(0,0,0,0);
+  return res;
+}
+
+function poblarSelectPaises(){
+  const sel = $('resumenPais');
+  paises.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = `${FLAG_PAIS[p]||''} ${p}`;
+    sel.appendChild(opt);
+  });
+}
+
+function filtrarHistorialPorResumen(hist){
+  const periodo = $('resumenPeriodo').value;
+  const pais = $('resumenPais').value;
+  const hoy = new Date(); hoy.setHours(0,0,0,0);
+  const inicioSemana = inicioDeSemana(hoy);
+
+  return hist.filter(h => {
+    if (pais !== 'todos' && h.paisOrigen !== pais && h.paisDestino !== pais) return false;
+    if (periodo === 'todo') return true;
+    const fh = isoADate(h.isoFecha);
+    if (!fh) return periodo === 'hoy' ? false : true; // registros viejos sin isoFecha: solo se excluyen de "hoy"
+    if (periodo === 'hoy') return fh.getTime() === hoy.getTime();
+    if (periodo === 'semana') return fh.getTime() >= inicioSemana.getTime();
+    if (periodo === 'mes') return fh.getFullYear() === hoy.getFullYear() && fh.getMonth() === hoy.getMonth();
+    return true;
+  });
+}
+
+function etiquetaPeriodo(){
+  const map = {hoy:'Hoy', semana:'Esta semana', mes:'Este mes', todo:'Todo'};
+  return map[$('resumenPeriodo').value] || 'Hoy';
+}
+
+function actualizarResumenDia(hist){
+  const filtrado = filtrarHistorialPorResumen(hist);
+  const totalGanancia = filtrado.reduce((sum,h) => sum + (parseFloat(h.ganancia)||0), 0);
+  const totalMovido = filtrado.reduce((sum,h) => sum + (parseFloat(h.usdtMovido)||0), 0);
+  $('daySummary').innerHTML = `
+    <div>${etiquetaPeriodo()}: <b>${filtrado.length}</b> operaci${filtrado.length===1?'ón':'ones'}</div>
+    <div>Movido: <b>${fmt(totalMovido,2)}</b> USDT</div>
+    <div>Ganancia: <span class="gain">${fmt(totalGanancia,2)} USDT</span></div>
+  `;
+}
+
+function renderHistorial(hist){
+  actualizarResumenDia(hist);
+
+  const query = ($('histSearch').value || '').toLowerCase().trim();
+  const conIndice = hist.map((h, idx) => ({h, idx}));
+  const filtrado = query
+    ? conIndice.filter(({h}) => (h.nombre||'').toLowerCase().includes(query) || String(h.id||'').toLowerCase().includes(query))
+    : conIndice;
+
+  const list = $('histList');
+  if (!hist.length){
+    list.innerHTML = '<div class="hist-empty">Aún no has registrado operaciones.</div>';
+    return;
+  }
+  if (!filtrado.length){
+    list.innerHTML = '<div class="hist-empty">No se encontraron operaciones para esa búsqueda.</div>';
+    return;
+  }
+  list.innerHTML = '';
+  filtrado.forEach(({h, idx}) => {
+    const div = document.createElement('div');
+    div.className = 'hist-item';
+    div.innerHTML = `
+      <div class="hist-top"><span>${h.nombre || 'Sin nombre'}</span><span>${h.fecha}</span></div>
+      <div class="hist-route">${h.ruta}${h.operador ? ' · Registrado por ' + h.operador : ''}</div>
+      <div class="hist-detail">${fmt(h.monto,0)} ${h.monedaOrigen} · Tasa ${fmt(h.tasaAplicada,4)} · <span class="hist-gain">+${fmt(h.ganancia,4)} USDT</span></div>
+      <button class="del-btn" data-idx="${idx}">Eliminar</button>
+    `;
+    list.appendChild(div);
+  });
+  list.querySelectorAll('.del-btn').forEach(b=>{
+    b.addEventListener('click', (e)=>{
+      const i = parseInt(e.target.dataset.idx);
+      const h = loadHistorial();
+      const item = h[i];
+      confirmarAccion(
+        'Eliminar operación',
+        `¿Eliminar el registro de ${item.nombre || 'este cliente'} (${fmt(item.monto,0)} ${item.monedaOrigen})? No se puede deshacer.`,
+        ()=>{
+          const h2 = loadHistorial();
+          h2.splice(i,1);
+          saveHistorial(h2);
+          renderHistorial(h2);
+          showToast('Operación eliminada');
+        }
+      );
+    });
+  });
+}
+
+$('histSearch').addEventListener('input', ()=> renderHistorial(loadHistorial()));
+$('resumenPeriodo').addEventListener('change', ()=> actualizarResumenDia(loadHistorial()));
+$('resumenPais').addEventListener('change', ()=> actualizarResumenDia(loadHistorial()));
+
+async function copiarAlPortapapeles(texto){
+  try{
+    await navigator.clipboard.writeText(texto);
+    return true;
+  }catch(e){
+    try{
+      const ta = document.createElement('textarea');
+      ta.value = texto;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      return true;
+    }catch(e2){ return false; }
+  }
+}
+
+function generarMensajeCotizacion(){
+  if (!ultimoResultado) return '';
+  const u = ultimoResultado;
+  const montoOrigenTxt = `${fmt(u.monto,0)} ${u.monedaOrigen}`;
+  const montoDestinoTxt = `${fmt(u.montoDestino,2)} ${u.monedaDestino}`;
+  const lineaMonto = modoActual === 'A'
+    ? `Monto recibido: ${montoOrigenTxt}`
+    : `Monto a pagar: ${montoOrigenTxt}`;
+  return `Hola 👋
+Ruta: ${u.flagOrigen} ${u.paisOrigen} → ${u.flagDestino} ${u.paisDestino}
+${lineaMonto}
+Tasa: ${fmt(u.tasaPublicada,6)}
+El beneficiario recibirá: ${montoDestinoTxt}
+Válido por 15 minutos.`;
+}
+
+$('btnCopiarCotizacion').addEventListener('click', async ()=>{
+  if (!ultimoResultado){ showToast('Completa monto y tasas primero'); return; }
+  const texto = generarMensajeCotizacion();
+  const ok = await copiarAlPortapapeles(texto);
+  showToast(ok ? 'Cotización copiada — pégala en WhatsApp' : 'No se pudo copiar');
+});
+
+$('btnCopiar').addEventListener('click', async ()=>{
+  const hist = loadHistorial();
+  if (!hist.length){ showToast('No hay operaciones para copiar'); return; }
+  // Orden: columnas A-L de la hoja Operaciones + Operador al final (para identificar quien la registro)
+  const rows = hist.map(h => [
+    h.fecha, h.id, h.nombre, h.ruta, h.monto, h.monedaOrigen,
+    h.tasaAplicada, h.ganancia.toFixed(4), h.referido, h.notas,
+    h.tasaCompra, h.tasaVenta, h.operador || ''
+  ].join('\t'));
+  const texto = rows.join('\n');
+  const ok = await copiarAlPortapapeles(texto);
+  showToast(ok ? 'Copiado — pégalo en la hoja Operaciones' : 'No se pudo copiar');
+});
+
+$('btnLimpiar').addEventListener('click', ()=>{
+  confirmarAccion(
+    'Borrar historial local',
+    'Esto borra todas las operaciones guardadas en este teléfono. Si no las has copiado a tu Excel todavía, se perderán. ¿Continuar?',
+    ()=>{
+      saveHistorial([]);
+      renderHistorial([]);
+      showToast('Historial borrado');
+    }
+  );
+});
+
+// ===== Modal de confirmacion generico (reemplaza confirm() nativo, que algunas apps bloquean) =====
+let confirmCallback = null;
+function confirmarAccion(titulo, texto, onConfirm){
+  $('confirmTitulo').textContent = titulo;
+  $('confirmTexto').textContent = texto;
+  confirmCallback = onConfirm;
+  $('modalConfirmBg').classList.add('show');
+}
+$('btnConfirmCancelar').addEventListener('click', ()=>{
+  $('modalConfirmBg').classList.remove('show');
+  confirmCallback = null;
+});
+$('btnConfirmAceptar').addEventListener('click', ()=>{
+  $('modalConfirmBg').classList.remove('show');
+  if (confirmCallback) confirmCallback();
+  confirmCallback = null;
+});
+
+// ===== Storage (localStorage: funciona en cualquier navegador, incluida la app instalada) =====
+function save(){
+  try{
+    guardarEstadoEnMemoria(rutaActual);
+    localStorage.setItem('valia_datos_por_ruta', JSON.stringify({ rutaActual, datosPorRuta, modoActual }));
+  }catch(e){}
+}
+
+function loadConfig(){
+  try{
+    const raw = localStorage.getItem('valia_datos_por_ruta');
+    if (raw){
+      const data = JSON.parse(raw);
+      if (data.datosPorRuta){
+        // combinar con los valores por defecto por si se agregan rutas nuevas en el futuro
+        datosPorRuta = Object.assign(crearDatosPorDefecto(), data.datosPorRuta);
+      }
+      if (data.rutaActual && RUTAS[data.rutaActual]){
+        rutaActual = data.rutaActual;
+      }
+      if (data.modoActual === 'A' || data.modoActual === 'B'){
+        modoActual = data.modoActual;
+        document.querySelectorAll('#modoBtns button').forEach(b=>{
+          b.classList.toggle('active', b.dataset.modo === modoActual);
+        });
+      }
+    }
+  }catch(e){}
+  document.querySelectorAll('.route-btn').forEach(b=>{
+    b.classList.toggle('active', b.dataset.ruta === rutaActual);
+  });
+}
+
+function loadHistorial(){
+  try{
+    const raw = localStorage.getItem('valia_historial');
+    if (raw) return JSON.parse(raw);
+  }catch(e){}
+  return [];
+}
+function saveHistorial(hist){
+  try{ localStorage.setItem('valia_historial', JSON.stringify(hist)); }catch(e){}
+}
+
+function loadOperador(){
+  try{ return localStorage.getItem('valia_operador') || ''; }catch(e){ return ''; }
+}
+function saveOperador(nombre){
+  try{ localStorage.setItem('valia_operador', nombre); }catch(e){}
+}
+
+function actualizarPillOperador(){
+  const nombre = loadOperador();
+  $('operadorNombre').textContent = nombre ? nombre : 'Configurar operador';
+}
+
+$('operadorPill').addEventListener('click', ()=>{
+  $('operadorInput').value = loadOperador();
+  $('modalOperadorBg').classList.add('show');
+});
+$('closeModalOperador').addEventListener('click', ()=> $('modalOperadorBg').classList.remove('show'));
+$('btnGuardarOperador').addEventListener('click', ()=>{
+  const nombre = $('operadorInput').value.trim();
+  saveOperador(nombre);
+  actualizarPillOperador();
+  $('modalOperadorBg').classList.remove('show');
+  showToast(nombre ? `Operador: ${nombre}` : 'Nombre borrado');
+});
+
+// ===== Tema oscuro =====
+function loadTheme(){
+  try{ return localStorage.getItem('valia_theme') || 'light'; }catch(e){ return 'light'; }
+}
+function aplicarTheme(theme){
+  document.documentElement.setAttribute('data-theme', theme);
+  $('themeToggle').textContent = theme === 'dark' ? '☀️' : '🌙';
+}
+$('themeToggle').addEventListener('click', ()=>{
+  const actual = loadTheme();
+  const nuevo = actual === 'dark' ? 'light' : 'dark';
+  try{ localStorage.setItem('valia_theme', nuevo); }catch(e){}
+  aplicarTheme(nuevo);
+});
+
+function init(){
+  aplicarTheme(loadTheme());
+  poblarSelectPaises();
+  loadConfig();
+  aplicarRuta();
+  abrirPaisDeRutaActual();
+  recalc();
+  const hist = loadHistorial();
+  renderHistorial(hist);
+  actualizarDatalistClientes();
+  actualizarPillOperador();
+  if (!loadOperador()){
+    setTimeout(()=> $('modalOperadorBg').classList.add('show'), 500);
+  }
+}
+init();
+
+// Registrar el service worker para que funcione sin internet (solo si el archivo
+// se abre desde un servidor http/https real, no funciona con file:// local)
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')){
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('service-worker.js').catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
