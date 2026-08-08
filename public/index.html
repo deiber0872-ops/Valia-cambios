@@ -863,10 +863,18 @@ $('btnGuardarTasas').addEventListener('click', async ()=>{
 $('btnActualizarSugerencia').addEventListener('click', async ()=>{
   showToast('Consultando Binance...');
   try{
-    await apiFetch('/api/tasas/sugerir', {method:'POST'});
+    const resp = await apiFetch('/api/tasas/sugerir', {method:'POST'});
     await cargarTasasMonedas();
     renderTasasScreen();
-    showToast('Sugerencia actualizada ✓');
+    const banner = $('sugerenciaBanner');
+    banner.classList.remove('hidden');
+    const filas = Object.entries(resp.resultado || {}).map(([moneda, r])=>{
+      if (r.error) return `${moneda}: ERROR — ${r.error}`;
+      if (!r.ok) return `${moneda}: sin ofertas suficientes (compra=${r.compra}, venta=${r.venta})`;
+      return `${moneda}: OK — compra ${fmt(r.compra,2)} / venta ${fmt(r.venta,2)}`;
+    });
+    banner.innerHTML = '<b>Resultado de la consulta:</b><br>' + filas.join('<br>');
+    showToast('Consulta terminada, revisa el detalle arriba');
   }catch(e){ showToast('No se pudo consultar: ' + e.message); }
 });
 
