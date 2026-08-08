@@ -262,6 +262,24 @@ async function handleApi(request, env, url) {
     return json({ ok: true, resultado });
   }
 
+  // Guarda una sugerencia calculada del lado del navegador (Binance bloquea las IPs de Cloudflare,
+  // asi que la consulta la hace el navegador del admin y solo el resultado se guarda aqui).
+  if (path === "/api/tasas/sugerencia" && method === "PUT") {
+    if (!user.is_admin) return json({ error: "Solo el administrador puede hacer esto." }, 403);
+    const body = await request.json();
+    const moneda = String(body.moneda || "").toUpperCase();
+    if (!MONEDAS.includes(moneda)) return json({ error: "Moneda invalida." }, 400);
+    const compra = Number(body.sugeridoCompra);
+    const venta = Number(body.sugeridoVenta);
+    if (!compra || !venta) return json({ error: "Valores de sugerencia invalidos." }, 400);
+    await env.DB.prepare(
+      `UPDATE tasas_monedas SET sugerido_compra=?, sugerido_venta=?, sugerido_en=? WHERE moneda=?`
+    )
+      .bind(compra, venta, new Date().toISOString(), moneda)
+      .run();
+    return json({ ok: true });
+  }
+
   // ---------- estado (tasas por ruta, ruta activa, modo) ----------
   if (path === "/api/state" && method === "GET") {
     const { results } = await env.DB.prepare("SELECT * FROM config_rutas WHERE user_id = ?").bind(user.id).all();
