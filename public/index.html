@@ -860,22 +860,77 @@ $('btnGuardarTasas').addEventListener('click', async ()=>{
   }catch(e){ showToast('No se pudo guardar: ' + e.message); }
 });
 
+// ===== Consulta a Binance P2P desde el navegador (el servidor de Cloudflare esta bloqueado por IP) =====
+const MONEDAS_BINANCE = ["VES","CLP","PEN","COP"];
+const KEYWORDS_METODO_PAGO = {
+  VES: ["mercantil", "venezuela"],
+  CLP: ["especifico", "specific"],
+  PEN: ["yape", "bcp"],
+  COP: ["nequi"],
+};
+
+async function binanceObtenerMetodosPago(fiat){
+  const res = await fetch(`https://p2p.binance.com/bapi/c2c/v1/public/c2c/agent/trade-methods?fiat=${fiat}`);
+  if (!res.ok) throw new Error(`HTTP ${res.status} al pedir metodos de pago`);
+  const data = await res.json();
+  return Array.isArray(data?.data) ? data.data : (Array.isArray(data) ? data : []);
+}
+function binanceFiltrarIdentificadores(metodos, keywords){
+  return metodos.filter(m=>{
+    const texto = `${m.identifier||''} ${m.tradeMethodName||''}`.toLowerCase();
+    return keywords.some(k=>texto.includes(k));
+  }).map(m=>m.identifier).filter(Boolean);
+}
+async function binanceObtenerPrecioPromedio(fiat, tradeType, identifiers){
+  if (!identifiers.length) return null;
+  const body = { asset:'USDT', fiat, tradeType, page:1, rows:5, payTypes: identifiers, publisherType: null };
+  const res = await fetch('https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search', {
+    method:'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status} al pedir anuncios`);
+  const data = await res.json();
+  const ads = (Array.isArray(data?.data)?data.data:[]).slice(0,5);
+  if (!ads.length) return null;
+  const precios = ads.map(a=>Number(a.adv?.price ?? a.price)).filter(p=>!isNaN(p)&&p>0);
+  if (!precios.length) return null;
+  return precios.reduce((a,b)=>a+b,0)/precios.length;
+}
+
 $('btnActualizarSugerencia').addEventListener('click', async ()=>{
-  showToast('Consultando Binance...');
-  try{
-    const resp = await apiFetch('/api/tasas/sugerir', {method:'POST'});
-    await cargarTasasMonedas();
-    renderTasasScreen();
-    const banner = $('sugerenciaBanner');
-    banner.classList.remove('hidden');
-    const filas = Object.entries(resp.resultado || {}).map(([moneda, r])=>{
-      if (r.error) return `${moneda}: ERROR — ${r.error}`;
-      if (!r.ok) return `${moneda}: sin ofertas suficientes (compra=${r.compra}, venta=${r.venta})`;
-      return `${moneda}: OK — compra ${fmt(r.compra,2)} / venta ${fmt(r.venta,2)}`;
-    });
-    banner.innerHTML = '<b>Resultado de la consulta:</b><br>' + filas.join('<br>');
-    showToast('Consulta terminada, revisa el detalle arriba');
-  }catch(e){ showToast('No se pudo consultar: ' + e.message); }
+  showToast('Consultando Binance desde tu navegador...');
+  const resultado = {};
+  for (const moneda of MONEDAS_BINANCE){
+    try{
+      const metodos = await binanceObtenerMetodosPago(moneda);
+      const ids = binanceFiltrarIdentificadores(metodos, KEYWORDS_METODO_PAGO[moneda]);
+      if (!ids.length){ resultado[moneda] = {error: 'No se encontro el metodo de pago configurado'}; continue; }
+      const [compra, venta] = await Promise.all([
+        binanceObtenerPrecioPromedio(moneda, 'BUY', ids),
+        binanceObtenerPrecioPromedio(moneda, 'SELL', ids)
+      ]);
+      if (compra != null && venta != null){
+        await apiFetch('/api/tasas/sugerencia', {method:'PUT', body: JSON.stringify({moneda, sugeridoCompra: compra, sugeridoVenta: venta})});
+        resultado[moneda] = {ok:true, compra, venta};
+      } else {
+        resultado[moneda] = {ok:false, compra, venta};
+      }
+    }catch(e){
+      resultado[moneda] = {error: String(e.message || e)};
+    }
+  }
+  await cargarTasasMonedas();
+  renderTasasScreen();
+  const banner = $('sugerenciaBanner');
+  banner.classList.remove('hidden');
+  const filas = Object.entries(resultado).map(([moneda, r])=>{
+    if (r.error) return `${moneda}: ERROR — ${r.error}`;
+    if (!r.ok) return `${moneda}: sin ofertas suficientes`;
+    return `${moneda}: OK — compra ${fmt(r.compra,2)} / venta ${fmt(r.venta,2)}`;
+  });
+  banner.innerHTML = '<b>Resultado de la consulta:</b><br>' + filas.join('<br>');
+  showToast('Consulta terminada, revisa el detalle arriba');
 });
 
 $('today').textContent = new Date().toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
