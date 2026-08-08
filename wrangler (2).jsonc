@@ -1,0 +1,20 @@
+{
+  "name": "valia",
+  "main": "src/index.js",
+  "compatibility_date": "2026-08-05",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "valia-db1",
+      "database_id": "055655ac-4b24-4b64-b638-86ba01a440c1"
+    }
+  ],
+  "triggers": {
+    "crons": ["30 12 * * *", "0 17 * * *"]
+  }
+}
