@@ -20,9 +20,18 @@ const KEYWORDS_METODO_PAGO = {
 const UMBRAL_MARGEN_MIN = 4; // %
 const TECHO_MARGEN_NOADMIN = 12; // %
 
+const BINANCE_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "*/*",
+  "Accept-Language": "es-ES,es;q=0.9",
+  "Content-Type": "application/json",
+  "Referer": "https://p2p.binance.com/",
+  "Origin": "https://p2p.binance.com",
+};
+
 async function obtenerMetodosPago(fiat) {
   const res = await fetch(`https://p2p.binance.com/bapi/c2c/v1/public/c2c/agent/trade-methods?fiat=${fiat}`, {
-    headers: { "User-Agent": "Mozilla/5.0" },
+    headers: BINANCE_HEADERS,
   });
   if (!res.ok) throw new Error(`trade-methods ${fiat}: HTTP ${res.status}`);
   const data = await res.json();
@@ -39,18 +48,30 @@ function filtrarIdentificadores(metodos, keywords) {
     .filter(Boolean);
 }
 
+// Endpoint clasico de busqueda de anuncios P2P (POST), el mas usado por trackers de precio.
 async function obtenerPrecioPromedio(fiat, tradeType, identifiers) {
   if (!identifiers.length) return null;
-  const params = new URLSearchParams({ fiat, asset: "USDT", tradeType, limit: "5" });
-  identifiers.forEach((id) => params.append("tradeMethodIdentifiers", id));
-  const res = await fetch(`https://p2p.binance.com/bapi/c2c/v1/public/c2c/agent/ad-list?${params.toString()}`, {
-    headers: { "User-Agent": "Mozilla/5.0" },
+  const body = {
+    asset: "USDT",
+    fiat,
+    tradeType, // "BUY" | "SELL"
+    page: 1,
+    rows: 5,
+    payTypes: identifiers,
+    publisherType: null,
+  };
+  const res = await fetch("https://p2p.binance.com/bapi/c2c/v2/friendly/c2c/adv/search", {
+    method: "POST",
+    headers: BINANCE_HEADERS,
+    body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`ad-list ${fiat} ${tradeType}: HTTP ${res.status}`);
+  if (!res.ok) throw new Error(`adv/search ${fiat} ${tradeType}: HTTP ${res.status}`);
   const data = await res.json();
   const ads = (Array.isArray(data?.data) ? data.data : []).slice(0, 5);
   if (!ads.length) return null;
-  const precios = ads.map((a) => Number(a.price ?? a.adv?.price)).filter((p) => !isNaN(p) && p > 0);
+  const precios = ads
+    .map((a) => Number(a.adv?.price ?? a.price))
+    .filter((p) => !isNaN(p) && p > 0);
   if (!precios.length) return null;
   return precios.reduce((a, b) => a + b, 0) / precios.length;
 }
