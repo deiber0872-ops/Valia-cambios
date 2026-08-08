@@ -750,12 +750,16 @@ async function cargarTasasMonedas(){
   }catch(e){ /* si falla, se usan los defaults de RUTAS como respaldo */ }
 }
 
+// RUTAS usa "Bs" para el bolivar, pero Binance/tasas_monedas usa el codigo ISO "VES".
+function codigoMonedaBinance(moneda){
+  return moneda === 'Bs' ? 'VES' : moneda;
+}
 function tasaCompraDeRuta(key){
-  const m = tasasMonedas[RUTAS[key].monedaOrigen];
+  const m = tasasMonedas[codigoMonedaBinance(RUTAS[key].monedaOrigen)];
   return (m && m.tasa_compra) ? m.tasa_compra : RUTAS[key].defCompra;
 }
 function tasaVentaDeRuta(key){
-  const m = tasasMonedas[RUTAS[key].monedaDestino];
+  const m = tasasMonedas[codigoMonedaBinance(RUTAS[key].monedaDestino)];
   return (m && m.tasa_venta) ? m.tasa_venta : RUTAS[key].defVenta;
 }
 
