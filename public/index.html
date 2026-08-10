@@ -580,7 +580,9 @@ async function apiFetch(path, opts = {}){
   let data = null;
   try{ data = await res.json(); }catch(e){}
   if (!res.ok){
-    throw new Error((data && data.error) ? data.error : 'Error de conexión');
+    const base = (data && data.error) ? data.error : 'Error de conexión';
+    const detalle = (data && data.detail) ? (' — ' + data.detail) : '';
+    throw new Error(base + detalle);
   }
   return data;
 }
