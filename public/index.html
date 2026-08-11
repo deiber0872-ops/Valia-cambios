@@ -514,8 +514,18 @@
     <h3>Tu cuenta</h3>
     <p style="font-size:13px;color:var(--ink);margin-top:-8px;">Conectado como <b id="cuentaNombre">—</b><span id="cuentaAdminBadge" class="hidden"> · administrador</span></p>
     <p style="font-size:12.5px;color:var(--muted);">Tus tasas e historial se guardan en tu cuenta y te siguen en cualquier dispositivo donde inicies sesión.</p>
+    <button class="btn-secondary" id="btnAbrirDashboard">📊 Resumen del día</button>
     <button class="btn-secondary hidden" id="btnAbrirTasasDia">💱 Tasas del día</button>
     <button class="btn-secondary" id="btnCerrarSesion" style="color:#B23A3A;border-color:#E7C9C9;">Cerrar sesión</button>
+  </div>
+</div>
+
+<!-- Modal Resumen del dia -->
+<div class="modal-bg" id="modalDashboardBg">
+  <div class="modal">
+    <button class="close-x" id="closeModalDashboard">×</button>
+    <h3>Resumen del día</h3>
+    <div id="dashboardContenido"></div>
   </div>
 </div>
 
@@ -1272,11 +1282,75 @@ function actualizarDatalistClientes(){
   });
 }
 
-function buscarIdPorNombre(nombre){
+function buscarClientePorId(id){
+  const hist = loadHistorial();
+  const found = hist.find(h => h.id && h.id === id);
+  return found ? {nombre: found.nombre, referido: found.referido} : null;
+}
+
+// ===== Resumen del dia (dashboard rapido) =====
+function calcularResumenDia(){
+  const hist = loadHistorial();
+  const hoy = todayYYYYMMDD();
+  const deHoy = hist.filter(h => h.isoFecha === hoy);
+  const totalOps = deHoy.length;
+  const gananciaTotal = deHoy.reduce((a,h)=> a + (Number(h.ganancia)||0), 0);
+  const margenProm = totalOps ? (deHoy.reduce((a,h)=> a + (Number(h.margenReal)||0), 0) / totalOps) : 0;
+  const porMoneda = {};
+  deHoy.forEach(h=>{
+    const m = h.monedaOrigen || '—';
+    porMoneda[m] = (porMoneda[m] || 0) + (Number(h.monto) || 0);
+  });
+  const conteoRutas = {};
+  deHoy.forEach(h=>{ conteoRutas[h.ruta] = (conteoRutas[h.ruta]||0) + 1; });
+  const rutaTop = Object.entries(conteoRutas).sort((a,b)=>b[1]-a[1])[0];
+  return { totalOps, gananciaTotal, margenProm, porMoneda, rutaTop };
+}
+
+function renderDashboard(){
+  const r = calcularResumenDia();
+  const montosTxt = Object.entries(r.porMoneda).map(([m,v])=> `${fmt(v,0)} ${m}`).join(' · ') || 'Sin movimiento aún';
+  const rutaTxt = r.rutaTop ? `${r.rutaTop[0]} (${r.rutaTop[1]} op.)` : '—';
+  $('dashboardContenido').innerHTML = `
+    <div class="field"><label>Operaciones hoy</label><p style="font-size:26px;margin:2px 0 0;font-weight:700;">${r.totalOps}</p></div>
+    <div class="field"><label>Ganancia total hoy</label><p style="font-size:22px;margin:2px 0 0;font-weight:700;color:var(--brand,#1a7a4c);">${fmt(r.gananciaTotal,4)} USDT</p></div>
+    <div class="field"><label>Margen promedio hoy</label><p style="font-size:20px;margin:2px 0 0;">${r.totalOps ? fmt(r.margenProm,2)+'%' : '—'}</p></div>
+    <div class="field"><label>Monto movido hoy</label><p style="font-size:14px;margin:2px 0 0;">${montosTxt}</p></div>
+    <div class="field"><label>Ruta más usada hoy</label><p style="font-size:14px;margin:2px 0 0;">${rutaTxt}</p></div>
+  `;
+}
+
+$('btnAbrirDashboard').addEventListener('click', ()=>{
+  $('modalOperadorBg').classList.remove('show');
+  renderDashboard();
+  $('modalDashboardBg').classList.add('show');
+});
+$('closeModalDashboard').addEventListener('click', ()=> $('modalDashboardBg').classList.remove('show'));
+
+$('regId').addEventListener('change', ()=>{
+  const id = $('regId').value.trim();
+  if (!id) return;
+  const cliente = buscarClientePorId(id);
+  if (cliente){
+    let algo = false;
+    if (!$('regNombre').value.trim() && cliente.nombre){ $('regNombre').value = cliente.nombre; algo = true; }
+    if (!$('regReferido').value.trim() && cliente.referido){ $('regReferido').value = cliente.referido; algo = true; }
+    if (algo) showToast('Cliente reconocido, datos autocompletados');
+  }
+});
+
+$('regNombre').addEventListener('change', ()=>{
+  const nombre = $('regNombre').value.trim();
+  if (!nombre) return;
   const hist = loadHistorial();
   const found = hist.find(h => h.nombre && h.nombre.toLowerCase() === nombre.toLowerCase());
-  return found ? found.id : '';
-}
+  if (found){
+    let algo = false;
+    if (!$('regId').value.trim() && found.id){ $('regId').value = found.id; algo = true; }
+    if (!$('regReferido').value.trim() && found.referido){ $('regReferido').value = found.referido; algo = true; }
+    if (algo) showToast('Cliente reconocido, datos autocompletados');
+  }
+});
 
 $('btnRegistrar').addEventListener('click', ()=>{
   if (!ultimoResultado){ showToast('Completa monto y tasas primero'); return; }
@@ -1285,13 +1359,6 @@ $('btnRegistrar').addEventListener('click', ()=>{
   $('modalBg').classList.add('show');
 });
 $('closeModal').addEventListener('click', ()=> $('modalBg').classList.remove('show'));
-
-$('regNombre').addEventListener('change', ()=>{
-  if (!$('regId').value.trim()){
-    const id = buscarIdPorNombre($('regNombre').value.trim());
-    if (id) $('regId').value = id;
-  }
-});
 
 function construirEntry(extra = {}){
   return {
