@@ -10,7 +10,8 @@ const PEPPER = "valia-2026-pepper"; // constante fija, no secreta pero evita col
 // ---------------------------------------------------------------------------
 // Config de sugerencia de tasas via Binance P2P (punto 1-5 definidos con el cliente)
 // ---------------------------------------------------------------------------
-const MONEDAS = ["VES", "CLP", "PEN", "COP"];
+const MONEDAS = ["VES", "CLP", "PEN", "COP", "EUR"]; // monedas que el admin puede editar en Tasas del dia
+const MONEDAS_BINANCE = ["VES", "CLP", "PEN", "COP"]; // EUR no aplica: es un corresponsal privado, no Binance P2P
 const KEYWORDS_METODO_PAGO = {
   VES: ["mercantil", "venezuela"],
   CLP: ["especifico", "specific"],
@@ -82,7 +83,7 @@ async function obtenerPrecioPromedio(fiat, tradeType, identifiers) {
 async function actualizarSugerenciasBinance(env) {
   const ahora = new Date().toISOString();
   const resultado = {};
-  for (const moneda of MONEDAS) {
+  for (const moneda of MONEDAS_BINANCE) {
     try {
       const metodos = await obtenerMetodosPago(moneda);
       const identifiers = filtrarIdentificadores(metodos, KEYWORDS_METODO_PAGO[moneda]);
