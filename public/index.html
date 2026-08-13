@@ -678,6 +678,70 @@ const RUTAS = {
     defCompra: 830, defVenta: 3200,
     comisionAplicaA: 'venta', defComision: 4, nueva: true
   },
+  EU_VE: {
+    label: "Europa → Venezuela", short: "EU → VE",
+    monedaOrigen: "EUR", monedaDestino: "Bs",
+    paisOrigen: "Europa", paisDestino: "Venezuela",
+    flagOrigen: "🇪🇺", flagDestino: "🇻🇪",
+    defCompra: 0.93, defVenta: 890,
+    comisionAplicaA: 'compra', defComision: 4, nueva: true
+  },
+  VE_EU: {
+    label: "Venezuela → Europa", short: "VE → EU",
+    monedaOrigen: "Bs", monedaDestino: "EUR",
+    paisOrigen: "Venezuela", paisDestino: "Europa",
+    flagOrigen: "🇻🇪", flagDestino: "🇪🇺",
+    defCompra: 890, defVenta: 0.93,
+    comisionAplicaA: 'venta', defComision: 4, nueva: true
+  },
+  EU_CL: {
+    label: "Europa → Chile", short: "EU → CL",
+    monedaOrigen: "EUR", monedaDestino: "CLP",
+    paisOrigen: "Europa", paisDestino: "Chile",
+    flagOrigen: "🇪🇺", flagDestino: "🇨🇱",
+    defCompra: 0.93, defVenta: 950,
+    comisionAplicaA: 'compra', defComision: 4, nueva: true
+  },
+  CL_EU: {
+    label: "Chile → Europa", short: "CL → EU",
+    monedaOrigen: "CLP", monedaDestino: "EUR",
+    paisOrigen: "Chile", paisDestino: "Europa",
+    flagOrigen: "🇨🇱", flagDestino: "🇪🇺",
+    defCompra: 950, defVenta: 0.93,
+    comisionAplicaA: 'venta', defComision: 4, nueva: true
+  },
+  EU_PE: {
+    label: "Europa → Perú", short: "EU → PE",
+    monedaOrigen: "EUR", monedaDestino: "PEN",
+    paisOrigen: "Europa", paisDestino: "Perú",
+    flagOrigen: "🇪🇺", flagDestino: "🇵🇪",
+    defCompra: 0.93, defVenta: 3.44,
+    comisionAplicaA: 'compra', defComision: 4, nueva: true
+  },
+  PE_EU: {
+    label: "Perú → Europa", short: "PE → EU",
+    monedaOrigen: "PEN", monedaDestino: "EUR",
+    paisOrigen: "Perú", paisDestino: "Europa",
+    flagOrigen: "🇵🇪", flagDestino: "🇪🇺",
+    defCompra: 3.44, defVenta: 0.93,
+    comisionAplicaA: 'venta', defComision: 4, nueva: true
+  },
+  EU_CO: {
+    label: "Europa → Colombia", short: "EU → CO",
+    monedaOrigen: "EUR", monedaDestino: "COP",
+    paisOrigen: "Europa", paisDestino: "Colombia",
+    flagOrigen: "🇪🇺", flagDestino: "🇨🇴",
+    defCompra: 0.93, defVenta: 3200,
+    comisionAplicaA: 'compra', defComision: 4, nueva: true
+  },
+  CO_EU: {
+    label: "Colombia → Europa", short: "CO → EU",
+    monedaOrigen: "COP", monedaDestino: "EUR",
+    paisOrigen: "Colombia", paisDestino: "Europa",
+    flagOrigen: "🇨🇴", flagDestino: "🇪🇺",
+    defCompra: 3200, defVenta: 0.93,
+    comisionAplicaA: 'venta', defComision: 4, nueva: true
+  },
   CO_CL: {
     label: "Colombia → Chile", short: "CO → CL",
     monedaOrigen: "COP", monedaDestino: "CLP",
@@ -802,13 +866,13 @@ function cargarEstadoDesdeMemoria(key){
 }
 
 // ===== Pantalla "Tasas del dia" (solo admin) =====
-const NOMBRE_MONEDA = { VES: 'Bolívar (VES)', CLP: 'Peso chileno (CLP)', PEN: 'Sol (PEN)', COP: 'Peso colombiano (COP)' };
+const NOMBRE_MONEDA = { VES: 'Bolívar (VES)', CLP: 'Peso chileno (CLP)', PEN: 'Sol (PEN)', COP: 'Peso colombiano (COP)', EUR: 'Euro (EUR)' };
 
 function renderTasasScreen(){
   const cont = $('tasasMonedasList');
   cont.innerHTML = '';
   let hayPendiente = false;
-  ['VES','CLP','PEN','COP'].forEach(moneda=>{
+  ['VES','CLP','PEN','COP','EUR'].forEach(moneda=>{
     const t = tasasMonedas[moneda] || {};
     const tieneSugerencia = t.sugerido_compra != null && t.sugerido_venta != null;
     if (tieneSugerencia) hayPendiente = true;
