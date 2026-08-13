@@ -248,12 +248,32 @@ async function handleApi(request, env, url) {
       tasaVenta = Number(body.tasaVenta) || 0;
     }
 
+    const ahora = new Date().toISOString();
     await env.DB.prepare(
       `UPDATE tasas_monedas SET tasa_compra=?, tasa_venta=?, confirmado_por=?, confirmado_en=? WHERE moneda=?`
     )
-      .bind(tasaCompra, tasaVenta, user.nombre, new Date().toISOString(), moneda)
+      .bind(tasaCompra, tasaVenta, user.nombre, ahora, moneda)
+      .run();
+    await env.DB.prepare(
+      `INSERT INTO tasas_historial (moneda, tasa_compra, tasa_venta, guardado_por, guardado_en) VALUES (?,?,?,?,?)`
+    )
+      .bind(moneda, tasaCompra, tasaVenta, user.nombre, ahora)
       .run();
     return json({ ok: true });
+  }
+
+  // Historial de una moneda a lo largo del tiempo (solo admin, mismo dueño de Tasas del dia)
+  if (path === "/api/tasas/historial" && method === "GET") {
+    if (!user.is_admin) return json({ error: "Solo el administrador puede ver esto." }, 403);
+    const moneda = String(url.searchParams.get("moneda") || "").toUpperCase();
+    if (!MONEDAS.includes(moneda)) return json({ error: "Moneda invalida." }, 400);
+    const { results } = await env.DB.prepare(
+      `SELECT tasa_compra, tasa_venta, guardado_por, guardado_en FROM tasas_historial
+       WHERE moneda = ? ORDER BY guardado_en DESC LIMIT 60`
+    )
+      .bind(moneda)
+      .all();
+    return json({ historial: results });
   }
 
   // Disparo manual de la sugerencia (admin-only) para probar sin esperar al cron de las 8:30am
