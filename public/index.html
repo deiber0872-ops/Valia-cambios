@@ -163,6 +163,13 @@
   }
   .margin-btns button.active{background:var(--teal);color:#fff;border-color:var(--teal);}
 
+  .btn-chip{
+    flex:1;padding:8px 4px;border-radius:8px;border:1px solid var(--line);
+    background:var(--btn-bg);color:var(--teal-deep);font-size:12.5px;font-weight:600;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .btn-chip.active{background:var(--teal);color:#fff;border-color:var(--teal);}
+
   .rate-out{
     display:flex;justify-content:space-between;align-items:baseline;
     background:linear-gradient(135deg,#FBF3DC,#F6EBC7);
@@ -514,18 +521,57 @@
     <h3>Tu cuenta</h3>
     <p style="font-size:13px;color:var(--ink);margin-top:-8px;">Conectado como <b id="cuentaNombre">—</b><span id="cuentaAdminBadge" class="hidden"> · administrador</span></p>
     <p style="font-size:12.5px;color:var(--muted);">Tus tasas e historial se guardan en tu cuenta y te siguen en cualquier dispositivo donde inicies sesión.</p>
-    <button class="btn-secondary" id="btnAbrirDashboard">📊 Resumen del día</button>
+    <button class="btn-secondary" id="btnAbrirDashboard">📊 Resumen</button>
+    <button class="btn-secondary" id="btnAbrirReferidos">👥 Referidos</button>
     <button class="btn-secondary hidden" id="btnAbrirTasasDia">💱 Tasas del día</button>
     <button class="btn-secondary" id="btnCerrarSesion" style="color:#B23A3A;border-color:#E7C9C9;">Cerrar sesión</button>
   </div>
 </div>
 
-<!-- Modal Resumen del dia -->
+<!-- Modal Resumen (por periodo y pais) -->
 <div class="modal-bg" id="modalDashboardBg">
   <div class="modal">
     <button class="close-x" id="closeModalDashboard">×</button>
-    <h3>Resumen del día</h3>
+    <h3>Resumen</h3>
+    <div style="display:flex;gap:6px;margin-bottom:10px;" id="dashPeriodoBtns">
+      <button class="btn-chip active" data-periodo="hoy">Hoy</button>
+      <button class="btn-chip" data-periodo="semana">7 días</button>
+      <button class="btn-chip" data-periodo="mes">30 días</button>
+    </div>
+    <div class="field" style="margin-bottom:10px;">
+      <label>País</label>
+      <select id="dashPaisFiltro"><option value="">Todos</option></select>
+    </div>
     <div id="dashboardContenido"></div>
+  </div>
+</div>
+
+<!-- Modal Referidos -->
+<div class="modal-bg" id="modalReferidosBg">
+  <div class="modal">
+    <button class="close-x" id="closeModalReferidos">×</button>
+    <h3>Referidos</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-8px;">Cliente: 0-4 referidos · Embajador: 5-14 · Aliado: 15+</p>
+    <div id="referidosContenido"></div>
+  </div>
+</div>
+
+<!-- Modal Historial de tasas (solo admin) -->
+<div class="modal-bg" id="modalHistTasasBg">
+  <div class="modal">
+    <button class="close-x" id="closeModalHistTasas">×</button>
+    <h3>Historial de tasas</h3>
+    <div class="field" style="margin-bottom:10px;">
+      <label>Moneda</label>
+      <select id="histTasasMoneda">
+        <option value="VES">Bolívar (VES)</option>
+        <option value="CLP">Peso chileno (CLP)</option>
+        <option value="PEN">Sol (PEN)</option>
+        <option value="COP">Peso colombiano (COP)</option>
+        <option value="EUR">Euro (EUR)</option>
+      </select>
+    </div>
+    <div id="histTasasContenido"></div>
   </div>
 </div>
 
@@ -540,6 +586,7 @@
     <div id="sugerenciaBanner" class="hidden" style="background:#FFF6E0;border:1px solid #E9D8A6;border-radius:10px;padding:10px 12px;margin-bottom:12px;font-size:12.5px;"></div>
     <div id="tasasMonedasList"></div>
     <button class="btn-secondary" id="btnActualizarSugerencia">🔄 Buscar sugerencia de Binance ahora</button>
+    <button class="btn-secondary" id="btnVerHistTasas">📈 Ver historial de esta moneda</button>
     <button class="btn-primary" id="btnGuardarTasas">Guardar tasas</button>
   </div>
 </div>
@@ -1013,6 +1060,61 @@ $('btnActualizarSugerencia').addEventListener('click', async ()=>{
   showToast('Consulta terminada, revisa el detalle arriba');
 });
 
+// ===== Historial de tasas (evolucion de compra/venta en el tiempo) =====
+function sparklineSVG(puntos, key, color){
+  // puntos vienen mas reciente primero; los invertimos para dibujar cronologicamente
+  const vals = puntos.map(p=>Number(p[key])).filter(v=>!isNaN(v)).reverse();
+  if (vals.length < 2) return '';
+  const w = 280, h = 60, pad = 4;
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const rango = (max - min) || 1;
+  const paso = (w - pad*2) / (vals.length - 1);
+  const coords = vals.map((v,i)=>{
+    const x = pad + i*paso;
+    const y = h - pad - ((v - min) / rango) * (h - pad*2);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  return `<svg viewBox="0 0 ${w} ${h}" style="width:100%;height:60px;"><polyline points="${coords}" fill="none" stroke="${color}" stroke-width="2"/></svg>`;
+}
+
+async function renderHistTasas(){
+  const moneda = $('histTasasMoneda').value;
+  $('histTasasContenido').innerHTML = '<p style="font-size:13px;color:var(--muted);">Cargando...</p>';
+  try{
+    const data = await apiFetch('/api/tasas/historial?moneda=' + encodeURIComponent(moneda));
+    const filas = data.historial || [];
+    if (!filas.length){
+      $('histTasasContenido').innerHTML = '<p style="font-size:13px;color:var(--muted);">Todavía no hay cambios registrados para esta moneda.</p>';
+      return;
+    }
+    const graficoCompra = sparklineSVG(filas, 'tasa_compra', '#1a7a4c');
+    const graficoVenta = sparklineSVG(filas, 'tasa_venta', '#B23A3A');
+    const tabla = filas.slice(0, 15).map(f=>{
+      const fecha = f.guardado_en ? new Date(f.guardado_en).toLocaleString('es-VE', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'}) : '—';
+      return `<div style="display:flex;justify-content:space-between;font-size:12.5px;padding:4px 0;border-bottom:1px solid var(--line);">
+        <span>${fecha}</span><span>Compra ${fmt(f.tasa_compra,2)} · Venta ${fmt(f.tasa_venta,2)}</span>
+      </div>`;
+    }).join('');
+    $('histTasasContenido').innerHTML = `
+      <p style="font-size:12px;color:var(--muted);margin-bottom:2px;">Compra (verde)</p>
+      ${graficoCompra || '<p style="font-size:12px;color:var(--muted);">No hay suficientes puntos aún</p>'}
+      <p style="font-size:12px;color:var(--muted);margin:8px 0 2px;">Venta (rojo)</p>
+      ${graficoVenta || '<p style="font-size:12px;color:var(--muted);">No hay suficientes puntos aún</p>'}
+      <div style="margin-top:10px;">${tabla}</div>
+    `;
+  }catch(e){
+    $('histTasasContenido').innerHTML = `<p style="font-size:13px;color:#B23A3A;">No se pudo cargar: ${e.message}</p>`;
+  }
+}
+
+$('btnVerHistTasas').addEventListener('click', ()=>{
+  $('modalTasasBg').classList.remove('show');
+  renderHistTasas();
+  $('modalHistTasasBg').classList.add('show');
+});
+$('closeModalHistTasas').addEventListener('click', ()=> $('modalHistTasasBg').classList.remove('show'));
+$('histTasasMoneda').addEventListener('change', renderHistTasas);
+
 $('today').textContent = new Date().toLocaleDateString('es-CL', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
 
 // Construir el selector agrupado por pais: un boton por pais que despliega
@@ -1352,44 +1454,130 @@ function buscarClientePorId(id){
   return found ? {nombre: found.nombre, referido: found.referido} : null;
 }
 
-// ===== Resumen del dia (dashboard rapido) =====
-function calcularResumenDia(){
+// ===== Resumen (dashboard con periodo y pais) =====
+function fechaHaceNDias(n){
+  const d = new Date();
+  d.setDate(d.getDate() - n);
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+let dashPeriodoActual = 'hoy';
+
+function poblarSelectPaises(){
+  const sel = $('dashPaisFiltro');
+  if (sel.options.length > 1) return; // ya poblado
+  paisesDesdeRutas().forEach(p=>{
+    const opt = document.createElement('option');
+    opt.value = p; opt.textContent = p;
+    sel.appendChild(opt);
+  });
+}
+
+function calcularResumen(periodo, pais){
   const hist = loadHistorial();
-  const hoy = todayYYYYMMDD();
-  const deHoy = hist.filter(h => h.isoFecha === hoy);
-  const totalOps = deHoy.length;
-  const gananciaTotal = deHoy.reduce((a,h)=> a + (Number(h.ganancia)||0), 0);
-  const margenProm = totalOps ? (deHoy.reduce((a,h)=> a + (Number(h.margenReal)||0), 0) / totalOps) : 0;
+  const desde = periodo === 'hoy' ? todayYYYYMMDD() : periodo === 'semana' ? fechaHaceNDias(6) : fechaHaceNDias(29);
+  let filtrado = hist.filter(h => h.isoFecha && h.isoFecha >= desde);
+  if (pais) filtrado = filtrado.filter(h => h.paisOrigen === pais || h.paisDestino === pais);
+
+  const totalOps = filtrado.length;
+  const gananciaTotal = filtrado.reduce((a,h)=> a + (Number(h.ganancia)||0), 0);
+  const margenProm = totalOps ? (filtrado.reduce((a,h)=> a + (Number(h.margenReal)||0), 0) / totalOps) : 0;
   const porMoneda = {};
-  deHoy.forEach(h=>{
+  filtrado.forEach(h=>{
     const m = h.monedaOrigen || '—';
     porMoneda[m] = (porMoneda[m] || 0) + (Number(h.monto) || 0);
   });
   const conteoRutas = {};
-  deHoy.forEach(h=>{ conteoRutas[h.ruta] = (conteoRutas[h.ruta]||0) + 1; });
+  filtrado.forEach(h=>{ conteoRutas[h.ruta] = (conteoRutas[h.ruta]||0) + 1; });
   const rutaTop = Object.entries(conteoRutas).sort((a,b)=>b[1]-a[1])[0];
   return { totalOps, gananciaTotal, margenProm, porMoneda, rutaTop };
 }
 
 function renderDashboard(){
-  const r = calcularResumenDia();
+  const r = calcularResumen(dashPeriodoActual, $('dashPaisFiltro').value);
   const montosTxt = Object.entries(r.porMoneda).map(([m,v])=> `${fmt(v,0)} ${m}`).join(' · ') || 'Sin movimiento aún';
   const rutaTxt = r.rutaTop ? `${r.rutaTop[0]} (${r.rutaTop[1]} op.)` : '—';
+  const etiquetaPeriodo = dashPeriodoActual === 'hoy' ? 'hoy' : dashPeriodoActual === 'semana' ? 'en 7 días' : 'en 30 días';
   $('dashboardContenido').innerHTML = `
-    <div class="field"><label>Operaciones hoy</label><p style="font-size:26px;margin:2px 0 0;font-weight:700;">${r.totalOps}</p></div>
-    <div class="field"><label>Ganancia total hoy</label><p style="font-size:22px;margin:2px 0 0;font-weight:700;color:var(--brand,#1a7a4c);">${fmt(r.gananciaTotal,4)} USDT</p></div>
-    <div class="field"><label>Margen promedio hoy</label><p style="font-size:20px;margin:2px 0 0;">${r.totalOps ? fmt(r.margenProm,2)+'%' : '—'}</p></div>
-    <div class="field"><label>Monto movido hoy</label><p style="font-size:14px;margin:2px 0 0;">${montosTxt}</p></div>
-    <div class="field"><label>Ruta más usada hoy</label><p style="font-size:14px;margin:2px 0 0;">${rutaTxt}</p></div>
+    <div class="field"><label>Operaciones ${etiquetaPeriodo}</label><p style="font-size:26px;margin:2px 0 0;font-weight:700;">${r.totalOps}</p></div>
+    <div class="field"><label>Ganancia total ${etiquetaPeriodo}</label><p style="font-size:22px;margin:2px 0 0;font-weight:700;color:var(--brand,#1a7a4c);">${fmt(r.gananciaTotal,4)} USDT</p></div>
+    <div class="field"><label>Margen promedio ${etiquetaPeriodo}</label><p style="font-size:20px;margin:2px 0 0;">${r.totalOps ? fmt(r.margenProm,2)+'%' : '—'}</p></div>
+    <div class="field"><label>Monto movido ${etiquetaPeriodo}</label><p style="font-size:14px;margin:2px 0 0;">${montosTxt}</p></div>
+    <div class="field"><label>Ruta más usada ${etiquetaPeriodo}</label><p style="font-size:14px;margin:2px 0 0;">${rutaTxt}</p></div>
   `;
 }
 
+document.querySelectorAll('#dashPeriodoBtns .btn-chip').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#dashPeriodoBtns .btn-chip').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    dashPeriodoActual = btn.dataset.periodo;
+    renderDashboard();
+  });
+});
+$('dashPaisFiltro').addEventListener('change', renderDashboard);
+
 $('btnAbrirDashboard').addEventListener('click', ()=>{
   $('modalOperadorBg').classList.remove('show');
+  poblarSelectPaises();
   renderDashboard();
   $('modalDashboardBg').classList.add('show');
 });
 $('closeModalDashboard').addEventListener('click', ()=> $('modalDashboardBg').classList.remove('show'));
+
+// ===== Panel de Referidos =====
+function nivelDesdeConteo(n){
+  if (n >= 15) return 'Aliado';
+  if (n >= 5) return 'Embajador';
+  return 'Cliente';
+}
+function faltanParaSiguiente(n){
+  if (n >= 15) return null; // ya es el nivel maximo
+  if (n >= 5) return { faltan: 15 - n, nivel: 'Aliado' };
+  return { faltan: 5 - n, nivel: 'Embajador' };
+}
+
+function calcularReferidos(){
+  const hist = loadHistorial();
+  const porReferido = {}; // referidoId -> Set de cliente_id distintos
+  hist.forEach(h=>{
+    const ref = (h.referido || '').trim();
+    if (!ref) return;
+    if (!porReferido[ref]) porReferido[ref] = new Set();
+    if (h.id) porReferido[ref].add(h.id);
+  });
+  return Object.entries(porReferido)
+    .map(([id, set]) => ({ id, conteo: set.size, nivel: nivelDesdeConteo(set.size) }))
+    .sort((a,b) => b.conteo - a.conteo);
+}
+
+function renderReferidos(){
+  const lista = calcularReferidos();
+  if (!lista.length){
+    $('referidosContenido').innerHTML = '<p style="font-size:13px;color:var(--muted);">Todavía no hay operaciones con el campo "Referido por" lleno.</p>';
+    return;
+  }
+  $('referidosContenido').innerHTML = lista.map(r=>{
+    const sig = faltanParaSiguiente(r.conteo);
+    const sigTxt = sig ? `le faltan ${sig.faltan} para ${sig.nivel}` : 'nivel máximo';
+    return `
+      <div class="field" style="border-bottom:1px solid var(--line);padding-bottom:8px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <b style="font-size:14px;">${r.id}</b>
+          <span style="font-size:12px;background:var(--btn-bg);padding:2px 8px;border-radius:6px;">${r.nivel}</span>
+        </div>
+        <p style="font-size:12.5px;color:var(--muted);margin:3px 0 0;">${r.conteo} referido${r.conteo===1?'':'s'} · ${sigTxt}</p>
+      </div>
+    `;
+  }).join('');
+}
+
+$('btnAbrirReferidos').addEventListener('click', ()=>{
+  $('modalOperadorBg').classList.remove('show');
+  renderReferidos();
+  $('modalReferidosBg').classList.add('show');
+});
+$('closeModalReferidos').addEventListener('click', ()=> $('modalReferidosBg').classList.remove('show'));
 
 $('regId').addEventListener('change', ()=>{
   const id = $('regId').value.trim();
