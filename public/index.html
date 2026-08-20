@@ -351,16 +351,16 @@
       <p class="card-title"><span class="n">2</span>Tasas de mercado (hoy)</p>
       <div class="field">
         <label id="lblCompra">Tasa compra USDT</label>
-        <div class="input-row" style="border-color:#E9C4C4;background:linear-gradient(135deg,#FBEAEA,#F6D9D9);">
-          <span class="unit" id="unitCompra" style="color:#8A2F2F;">—</span>
-          <input type="number" id="tasaCompra" inputmode="decimal" placeholder="0" readonly style="color:#8A2F2F;font-weight:700;">
+        <div class="input-row">
+          <span class="unit" id="unitCompra">—</span>
+          <input type="number" id="tasaCompra" inputmode="decimal" placeholder="0" readonly>
         </div>
       </div>
       <div class="field">
         <label id="lblVenta">Tasa venta USDT</label>
-        <div class="input-row" style="border-color:#E9C4C4;background:linear-gradient(135deg,#FBEAEA,#F6D9D9);">
-          <span class="unit" id="unitVenta" style="color:#8A2F2F;">—</span>
-          <input type="number" id="tasaVenta" inputmode="decimal" placeholder="0" readonly style="color:#8A2F2F;font-weight:700;">
+        <div class="input-row">
+          <span class="unit" id="unitVenta">—</span>
+          <input type="number" id="tasaVenta" inputmode="decimal" placeholder="0" readonly>
         </div>
       </div>
       <p class="hidden" id="linkTasasDia" style="font-size:12px;margin-top:-6px;">
@@ -373,9 +373,9 @@
           <input type="number" id="comisionExchange" inputmode="decimal" placeholder="0">
         </div>
       </div>
-      <div class="rate-out">
-        <span class="lbl">Tasa de mercado (sin margen)</span>
-        <span class="val" id="tasaMercado">—</span>
+      <div class="rate-out" id="tasaMercadoWrap" style="background:linear-gradient(135deg,#FBEAEA,#F6D9D9);border-color:#E9C4C4;">
+        <span class="lbl" style="color:#8A2F2F;">Tasa de mercado (sin margen)</span>
+        <span class="val" id="tasaMercado" style="color:#8A2F2F;">—</span>
       </div>
     </div>
 
@@ -1206,6 +1206,7 @@ function aplicarRuta(){
   }
   actualizarEtiquetasMonto();
   cargarEstadoDesdeMemoria(rutaActual);
+  $('tasaDivisorWrap').style.display = (r.paisOrigen === 'Colombia' || r.paisDestino === 'Colombia') ? '' : 'none';
 }
 
 function actualizarEtiquetasMonto(){
