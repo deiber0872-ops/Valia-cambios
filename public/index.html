@@ -346,6 +346,31 @@
       <div class="country-list" id="countryList"></div>
     </div>
 
+    <!-- Modo de entrega -->
+    <div class="card">
+      <p class="card-title"><span class="n">🔀</span>Modo de entrega</p>
+      <div class="margin-btns" id="modoEntregaBtns">
+        <button data-modo-entrega="local" class="active">🏦 Moneda local</button>
+        <button data-modo-entrega="usdt">🟡 USDT directo (Binance)</button>
+      </div>
+      <div id="destinatarioBinanceWrap" class="hidden" style="margin-top:12px;">
+        <div class="field">
+          <label>Tipo de dato del destinatario</label>
+          <div class="input-row">
+            <select id="destinatarioTipo">
+              <option value="Correo">Correo</option>
+              <option value="ID">ID de usuario Binance</option>
+              <option value="Teléfono">Teléfono</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label>Valor</label>
+          <div class="input-row"><input type="text" id="destinatarioValor" placeholder="Ej. correo@ejemplo.com"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- Tasas de mercado -->
     <div class="card">
       <p class="card-title"><span class="n">2</span>Tasas de mercado (hoy)</p>
@@ -356,7 +381,7 @@
           <input type="number" id="tasaCompra" inputmode="decimal" placeholder="0" readonly>
         </div>
       </div>
-      <div class="field">
+      <div id="tasaVentaBlock" class="field">
         <label id="lblVenta">Tasa venta USDT</label>
         <div class="input-row">
           <span class="unit" id="unitVenta">—</span>
@@ -844,6 +869,7 @@ Object.values(RUTAS).forEach(r => { FLAG_PAIS[r.paisOrigen] = r.flagOrigen; FLAG
 
 let rutaActual = "CL_VE";
 let modoActual = 'A'; // A: cliente envía X -> cuanto recibe. B: quiero que reciba exacto Y -> cuanto cobro.
+let modoEntregaActual = 'local'; // local: moneda del pais destino. usdt: transferencia directa a Binance.
 let selectedMargin = 5;
 let ultimoResultado = null;
 
@@ -1196,14 +1222,23 @@ function aplicarRuta(){
   $('lblTasaPublicada').textContent = `Tasa a publicar (${r.monedaDestino}/${r.monedaOrigen})`;
   if (r.comisionAplicaA === 'compra'){
     $('lblComision').textContent = `Comisión exchange al comprar USDT en ${r.paisOrigen} (%)`;
-    $('comisionField').style.display = '';
   } else if (r.comisionAplicaA === 'venta'){
     $('lblComision').textContent = `Comisión exchange al vender USDT en ${r.paisDestino} (%)`;
-    $('comisionField').style.display = '';
   } else {
     $('lblComision').textContent = 'Comisión exchange (%)';
-    $('comisionField').style.display = 'none';
   }
+
+  // Al cambiar de ruta, volvemos siempre a modo local por defecto (mas simple y predecible).
+  modoEntregaActual = 'local';
+  document.querySelectorAll('#modoEntregaBtns button').forEach(b=>{
+    b.classList.toggle('active', b.dataset.modoEntrega === 'local');
+  });
+  $('destinatarioBinanceWrap').classList.add('hidden');
+  $('destinatarioTipo').value = 'Correo';
+  $('destinatarioValor').value = '';
+  $('tasaVentaBlock').style.display = '';
+  aplicarComisionVisible();
+
   actualizarEtiquetasMonto();
   cargarEstadoDesdeMemoria(rutaActual);
   $('tasaDivisorWrap').style.display = (r.paisOrigen === 'Colombia' || r.paisDestino === 'Colombia') ? '' : 'none';
@@ -1215,8 +1250,8 @@ function actualizarEtiquetasMonto(){
     $('lblMonto').textContent = 'Monto que envía el cliente';
     $('unitMonto').textContent = r.monedaOrigen;
   } else {
-    $('lblMonto').textContent = 'Monto exacto que debe recibir el beneficiario';
-    $('unitMonto').textContent = r.monedaDestino;
+    $('lblMonto').textContent = modoEntregaActual === 'usdt' ? 'USDT exacto que debe recibir el destinatario' : 'Monto exacto que debe recibir el beneficiario';
+    $('unitMonto').textContent = modoEntregaActual === 'usdt' ? 'USDT' : r.monedaDestino;
   }
 }
 
@@ -1263,17 +1298,27 @@ function recalc(opts = {}){
   // La comision del exchange/corresponsal se resta siempre desde el lado que
   // le corresponda: al comprar USDT (si es la punta de origen) o al vender
   // USDT (si es la punta de destino). En rutas sin corresponsal, ambas quedan en 0.
+  // En modo USDT directo no hay punta de venta, asi que la comision 'venta' no aplica.
   const comisionPct = (parseFloat($('comisionExchange').value) || 0) / 100;
   const comisionCompra = r.comisionAplicaA === 'compra' ? comisionPct : 0;
-  const comisionVenta = r.comisionAplicaA === 'venta' ? comisionPct : 0;
+  const comisionVenta = (modoEntregaActual === 'local' && r.comisionAplicaA === 'venta') ? comisionPct : 0;
 
-  const tasaMercado = tc > 0 ? (1 - comisionCompra) * (1 - comisionVenta) * tv / tc : 0;
+  const esUsdtDirecto = modoEntregaActual === 'usdt';
+
+  // tasaMercado: en modo local es la conversion cruzada origen->destino de siempre.
+  // En modo USDT directo, es simplemente cuanto cuesta 1 USDT en la moneda de origen
+  // (ajustado por la comision de compra si aplica), ya que no hay segunda pata.
+  const tasaMercado = esUsdtDirecto
+    ? (tc > 0 ? tc / (1 - comisionCompra) : 0)
+    : (tc > 0 ? (1 - comisionCompra) * (1 - comisionVenta) * tv / tc : 0);
   $('tasaMercado').textContent = tasaMercado ? fmt(tasaMercado, 6) : '—';
 
   // Si el usuario NO ha editado la tasa publicada a mano, se sigue calculando desde el margen.
   // Si la edito a mano (o si venimos de tocar un boton de margen, que la "resetea"), se respeta su valor.
+  // Modo local: publicada = mercado * (1-m) (mas baja = mas margen). Modo USDT directo: al reves,
+  // publicada = mercado / (1-m) (mas alta = le entregas menos USDT por el mismo dinero = mas margen).
   if (!$('tasaPublicada').dataset.touched || opts.fromMargen){
-    const sugerida = tasaMercado * (1 - m);
+    const sugerida = esUsdtDirecto ? (tasaMercado / (1 - m)) : (tasaMercado * (1 - m));
     $('tasaPublicada').value = tasaMercado ? roundSmart(sugerida) : '';
     $('tasaPublicada').dataset.touched = '';
   }
@@ -1286,36 +1331,68 @@ function recalc(opts = {}){
   $('tasaDivisor').textContent = tasaPublicada > 0 ? fmt(1 / tasaPublicada, 2) : '—';
 
   // Margen efectivo con la tasa publicada actual (haya sido calculada o editada a mano)
-  const margenEfectivo = tasaMercado > 0 ? (1 - (tasaPublicada / tasaMercado)) * 100 : 0;
+  const margenEfectivo = tasaMercado > 0
+    ? (esUsdtDirecto ? (1 - tasaMercado / tasaPublicada) : (1 - (tasaPublicada / tasaMercado))) * 100
+    : 0;
   const elMargenEf = $('margenEfectivo');
   elMargenEf.textContent = tasaMercado ? `Margen con esta tasa: ${fmt(margenEfectivo,2)}%` : 'Margen con esta tasa: —';
   elMargenEf.classList.toggle('warn', tasaMercado > 0 && margenEfectivo < UMBRAL_MARGEN_BAJO);
 
-  if (monto > 0 && tc > 0 && tv > 0 && tasaPublicada > 0){
-    let montoOrigenFinal, montoDestinoFinal;
-    if (modoActual === 'A'){
-      montoOrigenFinal = monto;
-      montoDestinoFinal = monto * tasaPublicada;
-    } else {
-      montoDestinoFinal = monto; // lo que el usuario quiere que reciba exacto
-      montoOrigenFinal = monto / tasaPublicada; // lo que hay que cobrarle al cliente
-    }
+  const condicionValida = esUsdtDirecto
+    ? (monto > 0 && tc > 0 && tasaPublicada > 0)
+    : (monto > 0 && tc > 0 && tv > 0 && tasaPublicada > 0);
 
-    const usdtComprados = (montoOrigenFinal / tc) * (1 - comisionCompra);
-    const usdtUsados = montoDestinoFinal / (tv * (1 - comisionVenta));
-    const ganancia = usdtComprados - usdtUsados;
-    const margenReal = montoOrigenFinal > 0 ? (ganancia * tc) / montoOrigenFinal * 100 : 0;
+  if (condicionValida){
+    let montoOrigenFinal, montoDestinoFinal, usdtComprados, usdtUsados, ganancia, margenReal;
 
-    if (modoActual === 'A'){
-      $('lblResultado1').textContent = `Beneficiario recibe (${r.monedaDestino})`;
-      $('valResultado1').textContent = fmt(montoDestinoFinal, 2) + ' ' + r.monedaDestino;
-      $('lblResultado2').textContent = `Cliente envía (${r.monedaOrigen})`;
-      $('valResultado2').textContent = fmt(montoOrigenFinal, 2) + ' ' + r.monedaOrigen;
+    if (esUsdtDirecto){
+      if (modoActual === 'A'){
+        montoOrigenFinal = monto;
+        montoDestinoFinal = monto / tasaPublicada; // USDT que recibe el destinatario
+      } else {
+        montoDestinoFinal = monto; // USDT exacto que quiere recibir
+        montoOrigenFinal = monto * tasaPublicada; // lo que hay que cobrarle al cliente
+      }
+      usdtComprados = (montoOrigenFinal / tc) * (1 - comisionCompra);
+      usdtUsados = montoDestinoFinal; // el USDT que efectivamente se transfiere
+      ganancia = usdtComprados - usdtUsados;
+      margenReal = montoOrigenFinal > 0 ? (ganancia * tc) / montoOrigenFinal * 100 : 0;
+
+      if (modoActual === 'A'){
+        $('lblResultado1').textContent = 'Destinatario recibe (USDT en su Binance)';
+        $('valResultado1').textContent = fmt(montoDestinoFinal, 4) + ' USDT';
+        $('lblResultado2').textContent = `Cliente envía (${r.monedaOrigen})`;
+        $('valResultado2').textContent = fmt(montoOrigenFinal, 2) + ' ' + r.monedaOrigen;
+      } else {
+        $('lblResultado1').textContent = `Debes cobrarle al cliente (${r.monedaOrigen})`;
+        $('valResultado1').textContent = fmt(montoOrigenFinal, 2) + ' ' + r.monedaOrigen;
+        $('lblResultado2').textContent = 'Destinatario recibe exacto (USDT)';
+        $('valResultado2').textContent = fmt(montoDestinoFinal, 4) + ' USDT';
+      }
     } else {
-      $('lblResultado1').textContent = `Debes cobrarle al cliente (${r.monedaOrigen})`;
-      $('valResultado1').textContent = fmt(montoOrigenFinal, 2) + ' ' + r.monedaOrigen;
-      $('lblResultado2').textContent = `Beneficiario recibe exacto (${r.monedaDestino})`;
-      $('valResultado2').textContent = fmt(montoDestinoFinal, 2) + ' ' + r.monedaDestino;
+      if (modoActual === 'A'){
+        montoOrigenFinal = monto;
+        montoDestinoFinal = monto * tasaPublicada;
+      } else {
+        montoDestinoFinal = monto;
+        montoOrigenFinal = monto / tasaPublicada;
+      }
+      usdtComprados = (montoOrigenFinal / tc) * (1 - comisionCompra);
+      usdtUsados = montoDestinoFinal / (tv * (1 - comisionVenta));
+      ganancia = usdtComprados - usdtUsados;
+      margenReal = montoOrigenFinal > 0 ? (ganancia * tc) / montoOrigenFinal * 100 : 0;
+
+      if (modoActual === 'A'){
+        $('lblResultado1').textContent = `Beneficiario recibe (${r.monedaDestino})`;
+        $('valResultado1').textContent = fmt(montoDestinoFinal, 2) + ' ' + r.monedaDestino;
+        $('lblResultado2').textContent = `Cliente envía (${r.monedaOrigen})`;
+        $('valResultado2').textContent = fmt(montoOrigenFinal, 2) + ' ' + r.monedaOrigen;
+      } else {
+        $('lblResultado1').textContent = `Debes cobrarle al cliente (${r.monedaOrigen})`;
+        $('valResultado1').textContent = fmt(montoOrigenFinal, 2) + ' ' + r.monedaOrigen;
+        $('lblResultado2').textContent = `Beneficiario recibe exacto (${r.monedaDestino})`;
+        $('valResultado2').textContent = fmt(montoDestinoFinal, 2) + ' ' + r.monedaDestino;
+      }
     }
 
     $('usdtComprados').textContent = fmt(usdtComprados, 4) + ' USDT';
@@ -1327,10 +1404,13 @@ function recalc(opts = {}){
     elMargenReal.classList.toggle('warn', bajoMargen);
 
     ultimoResultado = {
-      ruta: r.label, monedaOrigen: r.monedaOrigen, monedaDestino: r.monedaDestino,
+      ruta: r.label, monedaOrigen: r.monedaOrigen, monedaDestino: esUsdtDirecto ? 'USDT' : r.monedaDestino,
       paisOrigen: r.paisOrigen, paisDestino: r.paisDestino, flagOrigen: r.flagOrigen, flagDestino: r.flagDestino,
       monto: montoOrigenFinal, montoDestino: montoDestinoFinal, tasaPublicada, tasaCompra: tc, tasaVenta: tv,
-      usdtComprados, ganancia, margenReal, montoPagar: montoDestinoFinal
+      usdtComprados, ganancia, margenReal, montoPagar: montoDestinoFinal,
+      modoEntrega: modoEntregaActual,
+      destinatarioTipo: esUsdtDirecto ? $('destinatarioTipo').value : '',
+      destinatarioValor: esUsdtDirecto ? $('destinatarioValor').value.trim() : ''
     };
   } else {
     $('valResultado1').textContent = '—';
@@ -1386,6 +1466,31 @@ document.querySelectorAll('#modoBtns button').forEach(btn=>{
     save();
   });
 });
+
+document.querySelectorAll('#modoEntregaBtns button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#modoEntregaBtns button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    modoEntregaActual = btn.dataset.modoEntrega;
+    $('destinatarioBinanceWrap').classList.toggle('hidden', modoEntregaActual !== 'usdt');
+    $('tasaVentaBlock').style.display = modoEntregaActual === 'usdt' ? 'none' : '';
+    $('tasaPublicada').dataset.touched = ''; // recalcular la sugerida con la formula del nuevo modo
+    aplicarComisionVisible();
+    recalc();
+  });
+});
+
+function aplicarComisionVisible(){
+  const r = RUTAS[rutaActual];
+  if (modoEntregaActual === 'usdt' && r.comisionAplicaA === 'venta'){
+    // En USDT directo no hay punta de venta, esa comision no aplica.
+    $('comisionField').style.display = 'none';
+  } else if (r.comisionAplicaA === 'compra' || r.comisionAplicaA === 'venta'){
+    $('comisionField').style.display = '';
+  } else {
+    $('comisionField').style.display = 'none';
+  }
+}
 
 function showToast(msg){
   const t = $('toast');
@@ -1645,6 +1750,9 @@ function construirEntry(extra = {}){
     tasaCompra: ultimoResultado.tasaCompra,
     tasaVenta: ultimoResultado.tasaVenta,
     margenReal: ultimoResultado.margenReal,
+    modoEntrega: ultimoResultado.modoEntrega || 'local',
+    destinatarioTipo: ultimoResultado.destinatarioTipo || '',
+    destinatarioValor: ultimoResultado.destinatarioValor || '',
     aprobadoManual: false,
     motivoAprobacion: '',
     nivelCliente: '',
@@ -1672,6 +1780,11 @@ const TECHO_MARGEN_NOADMIN = 12; // %
 
 $('btnGuardarReg').addEventListener('click', async ()=>{
   if (!ultimoResultado) return;
+
+  if (ultimoResultado.modoEntrega === 'usdt' && !ultimoResultado.destinatarioValor){
+    showToast('Falta el dato del destinatario en Binance (correo, ID o teléfono)');
+    return;
+  }
 
   const margenReal = ultimoResultado.margenReal;
   const referidoId = $('regReferido').value.trim();
@@ -1806,10 +1919,14 @@ function renderHistorial(hist){
     const aprobTxt = h.aprobadoManual
       ? `<div class="hist-detail" style="color:#B23A3A;">⚠ Margen bajo aprobado (${h.nivelCliente || 'referido'}) — ${h.motivoAprobacion || 'sin motivo'}</div>`
       : '';
+    const usdtTxt = h.modoEntrega === 'usdt'
+      ? `<div class="hist-detail" style="color:#7A5F1E;">🟡 USDT directo a Binance — ${h.destinatarioTipo || ''}: ${h.destinatarioValor || '—'}</div>`
+      : '';
     div.innerHTML = `
       <div class="hist-top"><span>${h.nombre || 'Sin nombre'}</span><span>${h.fecha}</span></div>
       <div class="hist-route">${h.ruta}${h.operador ? ' · Registrado por ' + h.operador : ''}${propietarioTxt}</div>
       <div class="hist-detail">${fmt(h.monto,0)} ${h.monedaOrigen} · Tasa ${fmt(h.tasaAplicada,4)} · <span class="hist-gain">+${fmt(h.ganancia,4)} USDT</span></div>
+      ${usdtTxt}
       ${aprobTxt}
       <button class="del-btn">Eliminar</button>
     `;
@@ -2001,6 +2118,7 @@ function mapServerRow(row){
     referido: row.referido, notas: row.notas,
     tasaCompra: row.tasa_compra, tasaVenta: row.tasa_venta, margenReal: row.margen_real,
     aprobadoManual: !!row.aprobado_manual, motivoAprobacion: row.motivo_aprobacion, nivelCliente: row.nivel_cliente,
+    modoEntrega: row.modo_entrega || 'local', destinatarioTipo: row.destinatario_tipo, destinatarioValor: row.destinatario_valor,
     propietario: row.propietario || null
   };
 }
