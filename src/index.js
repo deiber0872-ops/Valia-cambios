@@ -416,8 +416,9 @@ async function handleApi(request, env, url) {
       `INSERT INTO operaciones
         (user_id, fecha, iso_fecha, operador, cliente_id, nombre, ruta, pais_origen, pais_destino,
          monto, monto_destino, moneda_origen, moneda_destino, tasa_aplicada, ganancia, usdt_movido,
-         referido, notas, tasa_compra, tasa_venta, margen_real, aprobado_manual, motivo_aprobacion, nivel_cliente)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
+         referido, notas, tasa_compra, tasa_venta, margen_real, aprobado_manual, motivo_aprobacion, nivel_cliente,
+         modo_entrega, destinatario_tipo, destinatario_valor)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`
     )
       .bind(
         user.id,
@@ -443,7 +444,10 @@ async function handleApi(request, env, url) {
         h.margenReal || 0,
         tieneAprobacion ? 1 : 0,
         h.motivoAprobacion || "",
-        nivelCliente
+        nivelCliente,
+        h.modoEntrega || "local",
+        h.destinatarioTipo || "",
+        h.destinatarioValor || ""
       )
       .run();
     return json({ ok: true });
