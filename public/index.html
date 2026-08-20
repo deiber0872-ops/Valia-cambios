@@ -351,16 +351,16 @@
       <p class="card-title"><span class="n">2</span>Tasas de mercado (hoy)</p>
       <div class="field">
         <label id="lblCompra">Tasa compra USDT</label>
-        <div class="input-row">
-          <span class="unit" id="unitCompra">—</span>
-          <input type="number" id="tasaCompra" inputmode="decimal" placeholder="0" readonly>
+        <div class="input-row" style="border-color:#E9C4C4;background:linear-gradient(135deg,#FBEAEA,#F6D9D9);">
+          <span class="unit" id="unitCompra" style="color:#8A2F2F;">—</span>
+          <input type="number" id="tasaCompra" inputmode="decimal" placeholder="0" readonly style="color:#8A2F2F;font-weight:700;">
         </div>
       </div>
       <div class="field">
         <label id="lblVenta">Tasa venta USDT</label>
-        <div class="input-row">
-          <span class="unit" id="unitVenta">—</span>
-          <input type="number" id="tasaVenta" inputmode="decimal" placeholder="0" readonly>
+        <div class="input-row" style="border-color:#E9C4C4;background:linear-gradient(135deg,#FBEAEA,#F6D9D9);">
+          <span class="unit" id="unitVenta" style="color:#8A2F2F;">—</span>
+          <input type="number" id="tasaVenta" inputmode="decimal" placeholder="0" readonly style="color:#8A2F2F;font-weight:700;">
         </div>
       </div>
       <p class="hidden" id="linkTasasDia" style="font-size:12px;margin-top:-6px;">
@@ -398,9 +398,14 @@
 
       <div class="field" style="margin-top:14px;">
         <label id="lblTasaPublicada">Tasa a publicar hoy (editable)</label>
-        <div class="input-row" style="border-color:#E9D9A0;background:linear-gradient(135deg,#FBF3DC,#F6EBC7);">
-          <input type="number" id="tasaPublicada" inputmode="decimal" step="any" placeholder="0" style="font-weight:800;font-size:18px;color:#7A5F1E;">
+        <div class="input-row" style="border-color:#B9E0C4;background:linear-gradient(135deg,#E7F7EC,#D3EFDC);">
+          <input type="number" id="tasaPublicada" inputmode="decimal" step="any" placeholder="0" style="font-weight:800;font-size:18px;color:#1a7a4c;">
         </div>
+      </div>
+      <p style="font-size:11px;color:var(--muted);margin-top:-4px;">🔴 Rojo = tasa de mercado (referencia) · 🟢 Verde = lo que le confirmas al cliente</p>
+      <div class="rate-out" id="tasaDivisorWrap">
+        <span class="lbl">Tasa formato flyer (ej. Colombia: monto ÷ tasa)</span>
+        <span class="val" id="tasaDivisor">—</span>
       </div>
       <span class="margin-tag gold" id="margenEfectivo">Margen con esta tasa: —</span>
     </div>
@@ -1273,6 +1278,11 @@ function recalc(opts = {}){
   }
 
   const tasaPublicada = parseFloat($('tasaPublicada').value) || 0;
+
+  // Formato "flyer" (usado en Colombia): en vez de multiplicar monto x tasa,
+  // el publico divide monto / tasa. Es el mismo numero, solo invertido (1/tasaPublicada).
+  // Da el mismo resultado final, solo cambia como se comunica.
+  $('tasaDivisor').textContent = tasaPublicada > 0 ? fmt(1 / tasaPublicada, 2) : '—';
 
   // Margen efectivo con la tasa publicada actual (haya sido calculada o editada a mano)
   const margenEfectivo = tasaMercado > 0 ? (1 - (tasaPublicada / tasaMercado)) * 100 : 0;
