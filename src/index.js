@@ -373,6 +373,13 @@ async function handleApi(request, env, url) {
   if (path === "/api/historial" && method === "POST") {
     const h = await request.json();
     const margenReal = Number(h.margenReal) || 0;
+
+    if (typeof h.ruta === "string" && h.ruta.startsWith("USDT↔Bs")) {
+      const usdt = Number(h.usdtMovido) || 0;
+      if (usdt < 10 || usdt > 1000) {
+        return json({ error: `El monto (${usdt} USDT) debe estar entre 10 y 1.000 USDT.` }, 400);
+      }
+    }
     const referidoId = String(h.referido || "").trim();
     const tieneAprobacion = !!h.aprobadoManual && String(h.motivoAprobacion || "").trim().length > 0;
 
