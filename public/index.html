@@ -553,6 +553,7 @@
     <p style="font-size:12.5px;color:var(--muted);">Tus tasas e historial se guardan en tu cuenta y te siguen en cualquier dispositivo donde inicies sesión.</p>
     <button class="btn-secondary" id="btnAbrirDashboard">📊 Resumen</button>
     <button class="btn-secondary" id="btnAbrirReferidos">👥 Referidos</button>
+    <button class="btn-secondary" id="btnAbrirUsdtBs">₮ USDT ↔ Bolívares</button>
     <button class="btn-secondary hidden" id="btnAbrirTasasDia">💱 Tasas del día</button>
     <button class="btn-secondary" id="btnCerrarSesion" style="color:#B23A3A;border-color:#E7C9C9;">Cerrar sesión</button>
   </div>
@@ -583,6 +584,78 @@
     <h3>Referidos</h3>
     <p style="font-size:12.5px;color:var(--muted);margin-top:-8px;">Cliente: 0-4 referidos · Embajador: 5-14 · Aliado: 15+</p>
     <div id="referidosContenido"></div>
+  </div>
+</div>
+
+<!-- Modal USDT <-> Bolivares (producto local Venezuela) -->
+<div class="modal-bg" id="modalUsdtBsBg">
+  <div class="modal">
+    <button class="close-x" id="closeModalUsdtBs">×</button>
+    <h3>₮ USDT ↔ Bolívares</h3>
+    <p style="font-size:12.5px;color:var(--muted);margin-top:-8px;">Compra y venta de USDT con bolívares, dentro de Venezuela. Límite: 10-1.000 USDT.</p>
+
+    <div class="margin-btns" id="usdtBsDireccionBtns" style="margin-bottom:12px;">
+      <button data-direccion="venta" class="active">Cliente vende USDT</button>
+      <button data-direccion="compra">Cliente compra USDT</button>
+    </div>
+
+    <div class="field">
+      <label id="usdtBsLblMonto">Monto en USDT que entrega el cliente</label>
+      <div class="input-row">
+        <span class="unit">USDT</span>
+        <input type="number" id="usdtBsMonto" inputmode="decimal" placeholder="Entre 10 y 1.000">
+      </div>
+    </div>
+
+    <div class="rate-out" id="usdtBsRefWrap" style="background:linear-gradient(135deg,#FBEAEA,#F6D9D9);border-color:#E9C4C4;">
+      <span class="lbl" style="color:#8A2F2F;">Tasa referencia (promedio Binance)</span>
+      <span class="val" id="usdtBsTasaRef" style="color:#8A2F2F;">—</span>
+    </div>
+
+    <div class="field" style="margin-top:12px;">
+      <label>Margen Valía (%)</label>
+      <div class="input-row">
+        <span class="unit">%</span>
+        <input type="number" id="usdtBsMargen" inputmode="decimal" value="5">
+      </div>
+    </div>
+
+    <div class="rate-out" style="border-color:#B9E0C4;background:linear-gradient(135deg,#E7F7EC,#D3EFDC);">
+      <span class="lbl" style="color:#1a7a4c;">Tasa aplicada Valía</span>
+      <span class="val" id="usdtBsTasaAplicada" style="color:#1a7a4c;">—</span>
+    </div>
+
+    <div class="result-row hero" style="margin-top:12px;">
+      <span class="r-lbl" id="usdtBsLblResultado">Le entregas al cliente</span>
+      <span class="r-val" id="usdtBsResultado">—</span>
+    </div>
+    <div class="result-row">
+      <span class="r-lbl">Ganancia estimada</span>
+      <span class="r-val" id="usdtBsGanancia">—</span>
+    </div>
+
+    <div class="field" style="margin-top:14px;">
+      <label>Fecha</label>
+      <div class="input-row"><input type="date" id="usdtBsFecha"></div>
+    </div>
+    <div class="field">
+      <label>ID / Cédula del cliente</label>
+      <div class="input-row"><input type="text" id="usdtBsId" placeholder="Ej. 14297127"></div>
+    </div>
+    <div class="field">
+      <label>Nombre del cliente</label>
+      <div class="input-row"><input type="text" id="usdtBsNombre" placeholder="Nombre y apellido"></div>
+    </div>
+    <div class="field">
+      <label>Referido por (ID, opcional)</label>
+      <div class="input-row"><input type="text" id="usdtBsReferido" placeholder="Opcional"></div>
+    </div>
+    <div class="field">
+      <label>Notas</label>
+      <div class="input-row"><input type="text" id="usdtBsNotas" placeholder="Opcional"></div>
+    </div>
+
+    <button class="btn-primary" id="btnGuardarUsdtBs">Guardar operación</button>
   </div>
 </div>
 
@@ -1694,6 +1767,120 @@ $('btnAbrirReferidos').addEventListener('click', ()=>{
   $('modalReferidosBg').classList.add('show');
 });
 $('closeModalReferidos').addEventListener('click', ()=> $('modalReferidosBg').classList.remove('show'));
+
+// ===== Producto USDT <-> Bolivares (compra/venta local en Venezuela) =====
+let usdtBsDireccion = 'venta'; // venta: cliente entrega USDT, recibe Bs. compra: cliente paga Bs, recibe USDT.
+let usdtBsUltimo = null;
+
+document.querySelectorAll('#usdtBsDireccionBtns button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#usdtBsDireccionBtns button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    usdtBsDireccion = btn.dataset.direccion;
+    $('usdtBsLblMonto').textContent = usdtBsDireccion === 'venta'
+      ? 'Monto en USDT que entrega el cliente'
+      : 'Monto en USDT que quiere comprar el cliente';
+    recalcUsdtBs();
+  });
+});
+
+function recalcUsdtBs(){
+  const ves = tasasMonedas['VES'] || {};
+  const compra = Number(ves.tasa_compra) || 0;
+  const venta = Number(ves.tasa_venta) || 0;
+  const tasaRef = (compra > 0 && venta > 0) ? (compra + venta) / 2 : 0;
+  $('usdtBsTasaRef').textContent = tasaRef ? fmt(tasaRef, 2) + ' Bs' : 'Carga las tasas de VES primero';
+
+  const margen = (parseFloat($('usdtBsMargen').value) || 0) / 100;
+  // Venta (cliente entrega USDT): Valia paga menos Bs por USDT (compra barato).
+  // Compra (cliente paga Bs): Valia cobra mas Bs por USDT (vende caro).
+  const tasaAplicada = usdtBsDireccion === 'venta' ? tasaRef * (1 - margen) : tasaRef * (1 + margen);
+  $('usdtBsTasaAplicada').textContent = tasaAplicada ? fmt(tasaAplicada, 2) + ' Bs' : '—';
+
+  const montoUSDT = parseFloat($('usdtBsMonto').value) || 0;
+  const dentroDeLimite = montoUSDT >= 10 && montoUSDT <= 1000;
+
+  if (montoUSDT > 0 && !dentroDeLimite){
+    $('usdtBsResultado').textContent = 'Fuera del límite (10-1.000 USDT)';
+    $('usdtBsGanancia').textContent = '—';
+    usdtBsUltimo = null;
+    return;
+  }
+
+  if (montoUSDT > 0 && tasaAplicada > 0){
+    const montoBs = montoUSDT * tasaAplicada;
+    const gananciaUSDT = montoUSDT * margen;
+    if (usdtBsDireccion === 'venta'){
+      $('usdtBsLblResultado').textContent = 'Le entregas al cliente';
+      $('usdtBsResultado').textContent = fmt(montoBs, 2) + ' Bs';
+    } else {
+      $('usdtBsLblResultado').textContent = 'Debes cobrarle al cliente';
+      $('usdtBsResultado').textContent = fmt(montoBs, 2) + ' Bs';
+    }
+    $('usdtBsGanancia').textContent = fmt(gananciaUSDT, 4) + ' USDT';
+
+    usdtBsUltimo = {
+      direccion: usdtBsDireccion, montoUSDT, montoBs, tasaRef, tasaAplicada,
+      margenReal: margen * 100, gananciaUSDT
+    };
+  } else {
+    $('usdtBsResultado').textContent = '—';
+    $('usdtBsGanancia').textContent = '—';
+    usdtBsUltimo = null;
+  }
+}
+
+['usdtBsMonto','usdtBsMargen'].forEach(id=>{
+  $(id).addEventListener('input', recalcUsdtBs);
+});
+
+$('btnAbrirUsdtBs').addEventListener('click', ()=>{
+  $('modalOperadorBg').classList.remove('show');
+  $('usdtBsFecha').value = todayYYYYMMDD();
+  $('usdtBsMonto').value = '';
+  $('usdtBsId').value = ''; $('usdtBsNombre').value = ''; $('usdtBsReferido').value = ''; $('usdtBsNotas').value = '';
+  recalcUsdtBs();
+  $('modalUsdtBsBg').classList.add('show');
+});
+$('closeModalUsdtBs').addEventListener('click', ()=> $('modalUsdtBsBg').classList.remove('show'));
+
+$('btnGuardarUsdtBs').addEventListener('click', async ()=>{
+  if (!usdtBsUltimo){ showToast('Completa un monto válido entre 10 y 1.000 USDT'); return; }
+
+  const entry = {
+    fecha: yyyymmddADisplay($('usdtBsFecha').value),
+    isoFecha: $('usdtBsFecha').value || todayYYYYMMDD(),
+    operador: currentUser ? currentUser.nombre : '',
+    id: $('usdtBsId').value.trim(),
+    nombre: $('usdtBsNombre').value.trim(),
+    ruta: usdtBsUltimo.direccion === 'venta' ? 'USDT↔Bs: cliente vende USDT' : 'USDT↔Bs: cliente compra USDT',
+    paisOrigen: 'Venezuela', paisDestino: 'Venezuela',
+    monto: usdtBsUltimo.direccion === 'venta' ? usdtBsUltimo.montoUSDT : usdtBsUltimo.montoBs,
+    montoDestino: usdtBsUltimo.direccion === 'venta' ? usdtBsUltimo.montoBs : usdtBsUltimo.montoUSDT,
+    monedaOrigen: usdtBsUltimo.direccion === 'venta' ? 'USDT' : 'Bs',
+    monedaDestino: usdtBsUltimo.direccion === 'venta' ? 'Bs' : 'USDT',
+    tasaAplicada: usdtBsUltimo.tasaAplicada,
+    ganancia: usdtBsUltimo.gananciaUSDT,
+    usdtMovido: usdtBsUltimo.montoUSDT,
+    referido: $('usdtBsReferido').value.trim(),
+    notas: $('usdtBsNotas').value.trim(),
+    tasaCompra: usdtBsUltimo.tasaRef,
+    tasaVenta: usdtBsUltimo.tasaRef,
+    margenReal: usdtBsUltimo.margenReal,
+    modoEntrega: 'local',
+    destinatarioTipo: '', destinatarioValor: '',
+    aprobadoManual: false, motivoAprobacion: '', nivelCliente: ''
+  };
+
+  try{
+    await apiFetch('/api/historial', {method:'POST', body: JSON.stringify(entry)});
+    await refrescarHistorial();
+    $('modalUsdtBsBg').classList.remove('show');
+    showToast('Operación registrada ✓');
+  }catch(e){
+    showToast('No se pudo guardar: ' + e.message);
+  }
+});
 
 $('regId').addEventListener('change', ()=>{
   const id = $('regId').value.trim();
