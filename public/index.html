@@ -245,6 +245,7 @@
   .hist-item .hist-gain{color:#1F7A4D;font-weight:700;}
   .hist-empty{text-align:center;color:var(--muted);font-size:12.5px;padding:18px 10px;}
   .del-btn{background:none;border:none;color:#B23A3A;font-size:11px;font-weight:600;padding:0;margin-top:6px;-webkit-tap-highlight-color:transparent;}
+  .edit-btn{background:none;border:none;color:var(--teal-deep);font-size:11px;font-weight:600;padding:0;margin-top:6px;-webkit-tap-highlight-color:transparent;}
 
   .modal-bg{
     display:none;position:fixed;inset:0;background:rgba(10,30,28,0.55);
@@ -625,14 +626,16 @@
       <span class="val" id="usdtBsTasaAplicada" style="color:#1a7a4c;">—</span>
     </div>
 
-    <div class="result-row hero" style="margin-top:12px;background:linear-gradient(135deg,#E7F7EC,#D3EFDC);border-radius:10px;padding:12px;">
-      <span class="r-lbl" id="usdtBsLblResultado" style="font-weight:700;">Le entregas al cliente</span>
-      <span class="r-val" id="usdtBsResultado" style="font-size:22px;font-weight:800;">—</span>
-    </div>
-    <p style="font-size:11px;color:var(--muted);margin:10px 0 2px;">Ganancia de VALIA en esta operación (referencial, no es lo que recibe el cliente):</p>
-    <div class="result-row" style="opacity:0.75;">
-      <span class="r-lbl">Ganancia estimada</span>
-      <span class="r-val" id="usdtBsGanancia">—</span>
+    <div class="result-card" style="margin-top:12px;">
+      <p class="card-title" style="color:#fff;">Resultado</p>
+      <div class="result-row hero">
+        <span class="r-lbl" id="usdtBsLblResultado">Le entregas al cliente</span>
+        <span class="r-val" id="usdtBsResultado">—</span>
+      </div>
+      <div class="result-row" style="padding-top:2px;">
+        <span class="r-lbl">Ganancia estimada</span>
+        <span class="r-val" id="usdtBsGanancia" style="font-size:14px;">—</span>
+      </div>
     </div>
 
     <div class="field" style="margin-top:14px;">
@@ -721,6 +724,63 @@
       <div class="input-row"><input type="text" id="aprobMotivo" placeholder="Ej. balancear liquidez, cliente de alto volumen..."></div>
     </div>
     <button class="btn-primary" id="btnAprobarYGuardar">Aprobar y registrar</button>
+  </div>
+</div>
+
+<!-- Modal Editar operacion (correccion de datos) -->
+<div class="modal-bg" id="modalEditarBg">
+  <div class="modal">
+    <button class="close-x" id="closeModalEditar">×</button>
+    <h3>Editar operación</h3>
+    <p style="font-size:12px;color:var(--muted);margin-top:-8px;">
+      Ruta y modo de entrega no se pueden cambiar aquí — si necesitas cambiar eso, elimina y registra de nuevo.
+    </p>
+    <div class="field">
+      <label>Fecha</label>
+      <div class="input-row"><input type="date" id="editFecha"></div>
+    </div>
+    <div class="field">
+      <label>ID / Cédula del cliente</label>
+      <div class="input-row"><input type="text" id="editId"></div>
+    </div>
+    <div class="field">
+      <label>Nombre del cliente</label>
+      <div class="input-row"><input type="text" id="editNombre"></div>
+    </div>
+    <div class="field">
+      <label>Referido por (ID, opcional)</label>
+      <div class="input-row"><input type="text" id="editReferido"></div>
+    </div>
+    <div class="field">
+      <label id="editLblMonto">Monto origen</label>
+      <div class="input-row"><input type="number" id="editMonto" inputmode="decimal"></div>
+    </div>
+    <div class="field">
+      <label id="editLblMontoDestino">Monto destino</label>
+      <div class="input-row"><input type="number" id="editMontoDestino" inputmode="decimal"></div>
+    </div>
+    <div class="field">
+      <label>Tasa aplicada</label>
+      <div class="input-row"><input type="number" id="editTasaAplicada" inputmode="decimal" step="any"></div>
+    </div>
+    <div class="field">
+      <label>Ganancia (USDT)</label>
+      <div class="input-row"><input type="number" id="editGanancia" inputmode="decimal" step="any"></div>
+    </div>
+    <div class="field">
+      <label id="editLblUsdtMovido">USDT movido</label>
+      <div class="input-row"><input type="number" id="editUsdtMovido" inputmode="decimal" step="any"></div>
+    </div>
+    <div class="field">
+      <label>Margen real (%)</label>
+      <div class="input-row"><input type="number" id="editMargenReal" inputmode="decimal" step="any"></div>
+    </div>
+    <p style="font-size:11px;color:var(--muted);">Ganancia, USDT movido y margen no se recalculan solos aquí — si cambias monto o tasa, ajusta estos 3 a mano para que sigan cuadrando.</p>
+    <div class="field">
+      <label>Notas</label>
+      <div class="input-row"><input type="text" id="editNotas"></div>
+    </div>
+    <button class="btn-primary" id="btnGuardarEdicion">Guardar cambios</button>
   </div>
 </div>
 
@@ -1981,16 +2041,16 @@ $('btnGuardarReg').addEventListener('click', async ()=>{
   if (margenReal < UMBRAL_MARGEN_BAJO){
     const nivel = nivelDeCliente(referidoId);
 
-    if (nivel === 'Cliente'){
-      // Cliente directo (sin referido de nivel Embajador/Aliado): el hard stop bloquea.
+    if (nivel === 'Cliente' && !esAdmin){
+      // Cliente directo (sin referido de nivel Embajador/Aliado) y no eres admin: el hard stop bloquea.
       showToast('Margen por debajo del mínimo (4%). Ajusta la tasa o el monto antes de registrar.');
       return;
     }
 
-    // Embajador o Aliado: se permite con aprobacion manual y motivo registrado.
+    // Embajador, Aliado, o el admin (sin importar nivel): se permite con aprobacion manual y motivo.
     entryPendienteAprobacion = construirEntry({ nivelCliente: nivel });
     $('aprobMargen').textContent = fmt(margenReal, 2) + '%';
-    $('aprobNivel').textContent = nivel;
+    $('aprobNivel').textContent = esAdmin && nivel === 'Cliente' ? 'admin (sin referido)' : nivel;
     $('modalAprobacionBg').classList.add('show');
     return;
   }
@@ -2116,8 +2176,12 @@ function renderHistorial(hist){
       <div class="hist-detail">${fmt(h.monto,0)} ${h.monedaOrigen} · Tasa ${fmt(h.tasaAplicada,4)} · <span class="hist-gain">+${fmt(h.ganancia,4)} USDT</span></div>
       ${usdtTxt}
       ${aprobTxt}
-      <button class="del-btn">Eliminar</button>
+      <div style="display:flex;gap:14px;">
+        <button class="edit-btn">Editar</button>
+        <button class="del-btn">Eliminar</button>
+      </div>
     `;
+    div.querySelector('.edit-btn').addEventListener('click', ()=> abrirModalEditar(h));
     div.querySelector('.del-btn').addEventListener('click', ()=>{
       confirmarAccion(
         'Eliminar operación',
@@ -2139,6 +2203,63 @@ function renderHistorial(hist){
 
 $('histSearch').addEventListener('input', ()=> renderHistorial(loadHistorial()));
 $('resumenPeriodo').addEventListener('change', ()=> actualizarResumenDia(loadHistorial()));
+
+// ===== Editar operacion (correccion de datos ya registrados) =====
+let editandoDbId = null;
+
+function abrirModalEditar(h){
+  editandoDbId = h._dbId;
+  $('editFecha').value = h.isoFecha || displayADateISO(h.fecha) || '';
+  $('editId').value = h.id || '';
+  $('editNombre').value = h.nombre || '';
+  $('editReferido').value = h.referido || '';
+  $('editLblMonto').textContent = `Monto origen (${h.monedaOrigen || ''})`;
+  $('editMonto').value = h.monto ?? '';
+  $('editLblMontoDestino').textContent = `Monto destino (${h.monedaDestino || ''})`;
+  $('editMontoDestino').value = h.montoDestino ?? '';
+  $('editTasaAplicada').value = h.tasaAplicada ?? '';
+  $('editGanancia').value = h.ganancia ?? '';
+  $('editLblUsdtMovido').textContent = 'USDT movido';
+  $('editUsdtMovido').value = h.usdtMovido ?? '';
+  $('editMargenReal').value = h.margenReal ?? '';
+  $('editNotas').value = h.notas || '';
+  $('modalEditarBg').classList.add('show');
+}
+$('closeModalEditar').addEventListener('click', ()=>{
+  $('modalEditarBg').classList.remove('show');
+  editandoDbId = null;
+});
+
+$('btnGuardarEdicion').addEventListener('click', async ()=>{
+  if (!editandoDbId) return;
+  const margenEditado = parseFloat($('editMargenReal').value) || 0;
+  const fueraDeRango = margenEditado < UMBRAL_MARGEN_BAJO || margenEditado > TECHO_MARGEN_NOADMIN;
+  const body = {
+    fecha: yyyymmddADisplay($('editFecha').value),
+    isoFecha: $('editFecha').value,
+    id: $('editId').value.trim(),
+    nombre: $('editNombre').value.trim(),
+    referido: $('editReferido').value.trim(),
+    monto: parseFloat($('editMonto').value) || 0,
+    montoDestino: parseFloat($('editMontoDestino').value) || 0,
+    tasaAplicada: parseFloat($('editTasaAplicada').value) || 0,
+    ganancia: parseFloat($('editGanancia').value) || 0,
+    usdtMovido: parseFloat($('editUsdtMovido').value) || 0,
+    margenReal: margenEditado,
+    notas: $('editNotas').value.trim(),
+    aprobadoManual: fueraDeRango,
+    motivoAprobacion: fueraDeRango ? 'Edición manual — margen fuera del rango habitual' : ''
+  };
+  try{
+    await apiFetch('/api/historial/' + editandoDbId, {method:'PUT', body: JSON.stringify(body)});
+    await refrescarHistorial();
+    $('modalEditarBg').classList.remove('show');
+    editandoDbId = null;
+    showToast('Operación actualizada ✓');
+  }catch(e){
+    showToast('No se pudo guardar: ' + e.message);
+  }
+});
 $('resumenPais').addEventListener('change', ()=> actualizarResumenDia(loadHistorial()));
 
 async function copiarAlPortapapeles(texto){
