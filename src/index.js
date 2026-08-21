@@ -370,20 +370,13 @@ async function handleApi(request, env, url) {
     return json({ historial: results });
   }
 
-  if (path === "/api/historial" && method === "POST") {
-    const h = await request.json();
-    const margenReal = Number(h.margenReal) || 0;
-
-    if (typeof h.ruta === "string" && h.ruta.startsWith("USDT↔Bs")) {
-      const usdt = Number(h.usdtMovido) || 0;
-      if (usdt < 10 || usdt > 1000) {
-        return json({ error: `El monto (${usdt} USDT) debe estar entre 10 y 1.000 USDT.` }, 400);
-      }
-    }
+  // Valida el piso (4%) y el techo (12% para no-admin) del margen. El admin puede
+  // saltarse el bloqueo del piso incluso sin referido de nivel Embajador/Aliado,
+  // siempre que deje aprobacion manual con motivo (igual que Embajador/Aliado).
+  async function validarMargen(h, margenReal, user, env) {
     const referidoId = String(h.referido || "").trim();
     const tieneAprobacion = !!h.aprobadoManual && String(h.motivoAprobacion || "").trim().length > 0;
 
-    // Nivel del cliente (Cliente/Embajador/Aliado) calculado en el servidor, no confiando en el cliente.
     let nivelCliente = "Cliente";
     if (referidoId) {
       const { results: refRows } = await env.DB.prepare(
@@ -396,28 +389,52 @@ async function handleApi(request, env, url) {
     }
 
     if (margenReal < UMBRAL_MARGEN_MIN) {
-      if (nivelCliente === "Cliente") {
-        return json(
-          { error: `Margen (${margenReal.toFixed(2)}%) por debajo del minimo permitido (4%).` },
-          400
-        );
+      if (nivelCliente === "Cliente" && !user.is_admin) {
+        return {
+          error: json(
+            { error: `Margen (${margenReal.toFixed(2)}%) por debajo del minimo permitido (4%).` },
+            400
+          ),
+        };
       }
       if (!tieneAprobacion) {
-        return json(
-          { error: "Esta operacion esta por debajo del margen minimo y necesita aprobacion manual con motivo." },
-          400
-        );
+        return {
+          error: json(
+            { error: "Esta operacion esta por debajo del margen minimo y necesita aprobacion manual con motivo." },
+            400
+          ),
+        };
       }
     }
 
     if (!user.is_admin && margenReal > TECHO_MARGEN_NOADMIN && !tieneAprobacion) {
-      return json(
-        {
-          error: `Margen (${margenReal.toFixed(2)}%) por encima del maximo permitido para tu usuario (12%). Necesita aprobacion manual con motivo.`,
-        },
-        400
-      );
+      return {
+        error: json(
+          {
+            error: `Margen (${margenReal.toFixed(2)}%) por encima del maximo permitido para tu usuario (12%). Necesita aprobacion manual con motivo.`,
+          },
+          400
+        ),
+      };
     }
+
+    return { nivelCliente, tieneAprobacion };
+  }
+
+  if (path === "/api/historial" && method === "POST") {
+    const h = await request.json();
+    const margenReal = Number(h.margenReal) || 0;
+
+    if (typeof h.ruta === "string" && h.ruta.startsWith("USDT↔Bs")) {
+      const usdt = Number(h.usdtMovido) || 0;
+      if (usdt < 10 || usdt > 1000) {
+        return json({ error: `El monto (${usdt} USDT) debe estar entre 10 y 1.000 USDT.` }, 400);
+      }
+    }
+
+    const validacion = await validarMargen(h, margenReal, user, env);
+    if (validacion.error) return validacion.error;
+    const { nivelCliente, tieneAprobacion } = validacion;
 
     await env.DB.prepare(
       `INSERT INTO operaciones
@@ -457,6 +474,53 @@ async function handleApi(request, env, url) {
         h.destinatarioValor || ""
       )
       .run();
+    return json({ ok: true });
+  }
+
+  // Editar una operacion ya registrada (correccion de datos). Admin puede editar
+  // cualquiera; el resto solo las suyas. Se revalida el margen igual que al crear.
+  if (path.startsWith("/api/historial/") && method === "PUT") {
+    const id = path.split("/").pop();
+    const h = await request.json();
+    const margenReal = Number(h.margenReal) || 0;
+
+    const validacion = await validarMargen(h, margenReal, user, env);
+    if (validacion.error) return validacion.error;
+    const { tieneAprobacion } = validacion;
+
+    const whereClause = user.is_admin ? "WHERE id = ?" : "WHERE id = ? AND user_id = ?";
+    const bindArgs = [
+      h.fecha || "",
+      h.isoFecha || "",
+      h.id || "",
+      h.nombre || "",
+      h.monto || 0,
+      h.montoDestino || 0,
+      h.tasaAplicada || 0,
+      h.ganancia || 0,
+      h.usdtMovido || 0,
+      h.referido || "",
+      h.notas || "",
+      h.margenReal || 0,
+      tieneAprobacion ? 1 : 0,
+      h.motivoAprobacion || "",
+      id,
+    ];
+    if (!user.is_admin) bindArgs.push(user.id);
+
+    const { meta } = await env.DB.prepare(
+      `UPDATE operaciones SET
+        fecha=?, iso_fecha=?, cliente_id=?, nombre=?, monto=?, monto_destino=?,
+        tasa_aplicada=?, ganancia=?, usdt_movido=?, referido=?, notas=?, margen_real=?,
+        aprobado_manual=?, motivo_aprobacion=?
+       ${whereClause}`
+    )
+      .bind(...bindArgs)
+      .run();
+
+    if (!meta || meta.changes === 0) {
+      return json({ error: "No se encontró la operación (o no tienes permiso para editarla)." }, 404);
+    }
     return json({ ok: true });
   }
 
