@@ -600,11 +600,16 @@
       <button data-direccion="compra">Cliente compra USDT</button>
     </div>
 
+    <div class="margin-btns" id="usdtBsInputModoBtns" style="margin-bottom:12px;">
+      <button data-input-modo="usdt" class="active">Conozco el monto en USDT</button>
+      <button data-input-modo="bs">Conozco el monto en Bolívares</button>
+    </div>
+
     <div class="field">
       <label id="usdtBsLblMonto">Monto en USDT que entrega el cliente</label>
       <div class="input-row">
-        <span class="unit">USDT</span>
-        <input type="number" id="usdtBsMonto" inputmode="decimal" placeholder="Entre 10 y 1.000">
+        <span class="unit" id="usdtBsUnitMonto">USDT</span>
+        <input type="number" id="usdtBsMonto" inputmode="decimal" placeholder="0">
       </div>
     </div>
 
@@ -633,6 +638,10 @@
         <span class="r-val" id="usdtBsResultado">—</span>
       </div>
       <div class="result-row" style="padding-top:2px;">
+        <span class="r-lbl" id="usdtBsLblContrapartida">Cliente entrega</span>
+        <span class="r-val" id="usdtBsContrapartida" style="font-size:14px;">—</span>
+      </div>
+      <div class="result-row" style="padding-top:2px;opacity:0.75;">
         <span class="r-lbl">Ganancia estimada</span>
         <span class="r-val" id="usdtBsGanancia" style="font-size:14px;">—</span>
       </div>
@@ -659,6 +668,7 @@
       <div class="input-row"><input type="text" id="usdtBsNotas" placeholder="Opcional"></div>
     </div>
 
+    <button class="btn-secondary" id="btnCopiarCotizacionUsdtBs">📲 Copiar cotización para WhatsApp</button>
     <button class="btn-primary" id="btnGuardarUsdtBs">Guardar operación</button>
   </div>
 </div>
@@ -1614,6 +1624,11 @@ document.querySelectorAll('#modoEntregaBtns button').forEach(btn=>{
   });
 });
 
+// El monto/tasa no son lo unico que debe refrescar ultimoResultado: si el destinatario
+// de Binance se llena DESPUES de calcular, ultimoResultado se quedaba con el dato viejo (vacio).
+$('destinatarioTipo').addEventListener('change', recalc);
+$('destinatarioValor').addEventListener('input', recalc);
+
 function aplicarComisionVisible(){
   const r = RUTAS[rutaActual];
   if (modoEntregaActual === 'usdt' && r.comisionAplicaA === 'venta'){
@@ -1831,16 +1846,40 @@ $('closeModalReferidos').addEventListener('click', ()=> $('modalReferidosBg').cl
 
 // ===== Producto USDT <-> Bolivares (compra/venta local en Venezuela) =====
 let usdtBsDireccion = 'venta'; // venta: cliente entrega USDT, recibe Bs. compra: cliente paga Bs, recibe USDT.
+let usdtBsInputModo = 'usdt'; // usdt: conozco el monto en USDT. bs: conozco el monto en bolivares.
 let usdtBsUltimo = null;
+
+function actualizarLabelUsdtBsMonto(){
+  if (usdtBsInputModo === 'usdt'){
+    $('usdtBsUnitMonto').textContent = 'USDT';
+    $('usdtBsLblMonto').textContent = usdtBsDireccion === 'venta'
+      ? 'Monto en USDT que entrega el cliente'
+      : 'Monto en USDT que quiere comprar el cliente';
+  } else {
+    $('usdtBsUnitMonto').textContent = 'Bs';
+    $('usdtBsLblMonto').textContent = usdtBsDireccion === 'venta'
+      ? 'Bolívares que quiere recibir el cliente'
+      : 'Bolívares que tiene el cliente para comprar';
+  }
+}
 
 document.querySelectorAll('#usdtBsDireccionBtns button').forEach(btn=>{
   btn.addEventListener('click', ()=>{
     document.querySelectorAll('#usdtBsDireccionBtns button').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     usdtBsDireccion = btn.dataset.direccion;
-    $('usdtBsLblMonto').textContent = usdtBsDireccion === 'venta'
-      ? 'Monto en USDT que entrega el cliente'
-      : 'Monto en USDT que quiere comprar el cliente';
+    actualizarLabelUsdtBsMonto();
+    recalcUsdtBs();
+  });
+});
+
+document.querySelectorAll('#usdtBsInputModoBtns button').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('#usdtBsInputModoBtns button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    usdtBsInputModo = btn.dataset.inputModo;
+    $('usdtBsMonto').value = '';
+    actualizarLabelUsdtBsMonto();
     recalcUsdtBs();
   });
 });
@@ -1858,25 +1897,38 @@ function recalcUsdtBs(){
   const tasaAplicada = usdtBsDireccion === 'venta' ? tasaRef * (1 - margen) : tasaRef * (1 + margen);
   $('usdtBsTasaAplicada').textContent = tasaAplicada ? fmt(tasaAplicada, 2) + ' Bs' : '—';
 
-  const montoUSDT = parseFloat($('usdtBsMonto').value) || 0;
+  const inputVal = parseFloat($('usdtBsMonto').value) || 0;
+  let montoUSDT, montoBs;
+  if (usdtBsInputModo === 'usdt'){
+    montoUSDT = inputVal;
+    montoBs = tasaAplicada > 0 ? montoUSDT * tasaAplicada : 0;
+  } else {
+    montoBs = inputVal;
+    montoUSDT = tasaAplicada > 0 ? montoBs / tasaAplicada : 0;
+  }
+
   const dentroDeLimite = montoUSDT >= 10 && montoUSDT <= 1000;
 
-  if (montoUSDT > 0 && !dentroDeLimite){
-    $('usdtBsResultado').textContent = 'Fuera del límite (10-1.000 USDT)';
+  if (inputVal > 0 && !dentroDeLimite){
+    $('usdtBsResultado').textContent = `Fuera del límite (equivale a ${fmt(montoUSDT,2)} USDT, debe ser 10-1.000)`;
+    $('usdtBsContrapartida').textContent = '—';
     $('usdtBsGanancia').textContent = '—';
     usdtBsUltimo = null;
     return;
   }
 
-  if (montoUSDT > 0 && tasaAplicada > 0){
-    const montoBs = montoUSDT * tasaAplicada;
+  if (inputVal > 0 && tasaAplicada > 0){
     const gananciaUSDT = montoUSDT * margen;
     if (usdtBsDireccion === 'venta'){
       $('usdtBsLblResultado').textContent = 'Le entregas al cliente';
       $('usdtBsResultado').textContent = fmt(montoBs, 2) + ' Bs';
+      $('usdtBsLblContrapartida').textContent = 'Cliente entrega';
+      $('usdtBsContrapartida').textContent = fmt(montoUSDT, 4) + ' USDT';
     } else {
-      $('usdtBsLblResultado').textContent = 'Debes cobrarle al cliente';
-      $('usdtBsResultado').textContent = fmt(montoBs, 2) + ' Bs';
+      $('usdtBsLblResultado').textContent = 'Le entregas al cliente';
+      $('usdtBsResultado').textContent = fmt(montoUSDT, 4) + ' USDT';
+      $('usdtBsLblContrapartida').textContent = 'Cliente paga';
+      $('usdtBsContrapartida').textContent = fmt(montoBs, 2) + ' Bs';
     }
     $('usdtBsGanancia').textContent = fmt(gananciaUSDT, 4) + ' USDT';
 
@@ -1886,6 +1938,7 @@ function recalcUsdtBs(){
     };
   } else {
     $('usdtBsResultado').textContent = '—';
+    $('usdtBsContrapartida').textContent = '—';
     $('usdtBsGanancia').textContent = '—';
     usdtBsUltimo = null;
   }
@@ -1905,8 +1958,33 @@ $('btnAbrirUsdtBs').addEventListener('click', ()=>{
 });
 $('closeModalUsdtBs').addEventListener('click', ()=> $('modalUsdtBsBg').classList.remove('show'));
 
+function generarMensajeCotizacionUsdtBs(){
+  if (!usdtBsUltimo) return '';
+  const u = usdtBsUltimo;
+  const lineaMonto = u.direccion === 'venta'
+    ? `Entregas: ${fmt(u.montoUSDT,4)} USDT`
+    : `Pagas: ${fmt(u.montoBs,2)} Bs`;
+  const lineaResultado = u.direccion === 'venta'
+    ? `Recibes: ${fmt(u.montoBs,2)} Bs`
+    : `Recibes: ${fmt(u.montoUSDT,4)} USDT`;
+  return `Hola 👋
+₮ USDT ↔ Bolívares — VALIA
+${u.direccion === 'venta' ? 'Venta de USDT' : 'Compra de USDT'}
+${lineaMonto}
+Tasa aplicada: ${fmt(u.tasaAplicada,2)} Bs
+${lineaResultado}
+Válido por 40 minutos. Pasado este tiempo, por favor vuelve a solicitar la cotización.`;
+}
+
+$('btnCopiarCotizacionUsdtBs').addEventListener('click', async ()=>{
+  if (!usdtBsUltimo){ showToast('Completa un monto válido primero'); return; }
+  const texto = generarMensajeCotizacionUsdtBs();
+  const ok = await copiarAlPortapapeles(texto);
+  showToast(ok ? 'Cotización copiada — pégala en WhatsApp' : 'No se pudo copiar');
+});
+
 $('btnGuardarUsdtBs').addEventListener('click', async ()=>{
-  if (!usdtBsUltimo){ showToast('Completa un monto válido entre 10 y 1.000 USDT'); return; }
+  if (!usdtBsUltimo){ showToast('Completa un monto válido (equivalente entre 10 y 1.000 USDT)'); return; }
 
   const entry = {
     fecha: yyyymmddADisplay($('usdtBsFecha').value),
@@ -2292,7 +2370,7 @@ Ruta: ${u.flagOrigen} ${u.paisOrigen} → ${u.flagDestino} ${u.paisDestino}
 ${lineaMonto}
 Tasa: ${fmt(u.tasaPublicada,6)}
 El beneficiario recibirá: ${montoDestinoTxt}
-Válido por 15 minutos.`;
+Válido por 40 minutos. Pasado este tiempo, por favor vuelve a solicitar la cotización.`;
 }
 
 $('btnCopiarCotizacion').addEventListener('click', async ()=>{
