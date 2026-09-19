@@ -686,6 +686,7 @@
         <option value="PEN">Sol (PEN)</option>
         <option value="COP">Peso colombiano (COP)</option>
         <option value="EUR">Euro (EUR)</option>
+        <option value="USD">Dólar - Zelle (USD)</option>
       </select>
     </div>
     <div id="histTasasContenido"></div>
@@ -994,6 +995,24 @@ const RUTAS = {
     flagOrigen: "🇵🇪", flagDestino: "🇨🇴",
     defCompra: 3.36, defVenta: 3200,
     comisionAplicaA: 'venta', defComision: 4, nueva: true
+  },
+  ZE_VE: {
+    label: "Zelle → Venezuela", short: "ZE → VE",
+    monedaOrigen: "USD", monedaDestino: "Bs",
+    paisOrigen: "Zelle (EE.UU.)", paisDestino: "Venezuela",
+    flagOrigen: "💵", flagDestino: "🇻🇪",
+    defCompra: 1, defVenta: 890,
+    // La comision es de Zinli al recibir/convertir el Zelle, no del exchange en si.
+    // Es aproximada (parece variar) — ajustala en cada operacion segun lo que Zinli cobre ese dia.
+    comisionAplicaA: 'compra', defComision: 6, nueva: true
+  },
+  VE_ZE: {
+    label: "Venezuela → Zelle", short: "VE → ZE",
+    monedaOrigen: "Bs", monedaDestino: "USD",
+    paisOrigen: "Venezuela", paisDestino: "Zelle (EE.UU.)",
+    flagOrigen: "🇻🇪", flagDestino: "💵",
+    defCompra: 890, defVenta: 1,
+    comisionAplicaA: 'venta', defComision: 6, nueva: true
   }
 };
 
@@ -1088,13 +1107,13 @@ function cargarEstadoDesdeMemoria(key){
 }
 
 // ===== Pantalla "Tasas del dia" (solo admin) =====
-const NOMBRE_MONEDA = { VES: 'Bolívar (VES)', CLP: 'Peso chileno (CLP)', PEN: 'Sol (PEN)', COP: 'Peso colombiano (COP)', EUR: 'Euro (EUR)' };
+const NOMBRE_MONEDA = { VES: 'Bolívar (VES)', CLP: 'Peso chileno (CLP)', PEN: 'Sol (PEN)', COP: 'Peso colombiano (COP)', EUR: 'Euro (EUR)', USD: 'Dólar - Zelle (USD)' };
 
 function renderTasasScreen(){
   const cont = $('tasasMonedasList');
   cont.innerHTML = '';
   let hayPendiente = false;
-  ['VES','CLP','PEN','COP','EUR'].forEach(moneda=>{
+  ['VES','CLP','PEN','COP','EUR','USD'].forEach(moneda=>{
     const t = tasasMonedas[moneda] || {};
     const tieneSugerencia = t.sugerido_compra != null && t.sugerido_venta != null;
     if (tieneSugerencia) hayPendiente = true;
