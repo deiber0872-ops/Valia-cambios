@@ -10,7 +10,7 @@ const PEPPER = "valia-2026-pepper"; // constante fija, no secreta pero evita col
 // ---------------------------------------------------------------------------
 // Config de sugerencia de tasas via Binance P2P (punto 1-5 definidos con el cliente)
 // ---------------------------------------------------------------------------
-const MONEDAS = ["VES", "CLP", "PEN", "COP", "EUR"]; // monedas que el admin puede editar en Tasas del dia
+const MONEDAS = ["VES", "CLP", "PEN", "COP", "EUR", "USD"]; // monedas que el admin puede editar en Tasas del dia
 const MONEDAS_BINANCE = ["VES", "CLP", "PEN", "COP"]; // EUR no aplica: es un corresponsal privado, no Binance P2P
 const KEYWORDS_METODO_PAGO = {
   VES: ["mercantil", "venezuela"],
