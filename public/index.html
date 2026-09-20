@@ -602,10 +602,21 @@
   <div class="modal">
     <button class="close-x" id="closeModalDashboard">×</button>
     <h3>Resumen</h3>
-    <div style="display:flex;gap:6px;margin-bottom:10px;" id="dashPeriodoBtns">
+    <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;" id="dashPeriodoBtns">
       <button class="btn-chip active" data-periodo="hoy">Hoy</button>
       <button class="btn-chip" data-periodo="semana">7 días</button>
       <button class="btn-chip" data-periodo="mes">30 días</button>
+      <button class="btn-chip" data-periodo="rango">Personalizado</button>
+    </div>
+    <div id="dashRangoWrap" class="hidden" style="display:flex;gap:8px;margin-bottom:10px;">
+      <div class="field" style="flex:1;margin-bottom:0;">
+        <label>Desde</label>
+        <div class="input-row"><input type="date" id="dashRangoDesde"></div>
+      </div>
+      <div class="field" style="flex:1;margin-bottom:0;">
+        <label>Hasta</label>
+        <div class="input-row"><input type="date" id="dashRangoHasta"></div>
+      </div>
     </div>
     <div class="field" style="margin-bottom:10px;">
       <label>País</label>
@@ -1823,8 +1834,16 @@ function poblarSelectPaises(){
 
 function calcularResumen(periodo, pais){
   const hist = loadHistorial();
-  const desde = periodo === 'hoy' ? todayYYYYMMDD() : periodo === 'semana' ? fechaHaceNDias(6) : fechaHaceNDias(29);
-  let filtrado = hist.filter(h => h.isoFecha && h.isoFecha >= desde);
+  let desde, hasta;
+  if (periodo === 'rango'){
+    desde = $('dashRangoDesde').value || todayYYYYMMDD();
+    hasta = $('dashRangoHasta').value || todayYYYYMMDD();
+    if (desde > hasta){ const t = desde; desde = hasta; hasta = t; } // por si las invierten sin querer
+  } else {
+    desde = periodo === 'hoy' ? todayYYYYMMDD() : periodo === 'semana' ? fechaHaceNDias(6) : fechaHaceNDias(29);
+    hasta = todayYYYYMMDD();
+  }
+  let filtrado = hist.filter(h => h.isoFecha && h.isoFecha >= desde && h.isoFecha <= hasta);
   if (pais) filtrado = filtrado.filter(h => h.paisOrigen === pais || h.paisDestino === pais);
 
   const totalOps = filtrado.length;
@@ -1838,14 +1857,17 @@ function calcularResumen(periodo, pais){
   const conteoRutas = {};
   filtrado.forEach(h=>{ conteoRutas[h.ruta] = (conteoRutas[h.ruta]||0) + 1; });
   const rutaTop = Object.entries(conteoRutas).sort((a,b)=>b[1]-a[1])[0];
-  return { totalOps, gananciaTotal, margenProm, porMoneda, rutaTop };
+  return { totalOps, gananciaTotal, margenProm, porMoneda, rutaTop, desde, hasta };
 }
 
 function renderDashboard(){
   const r = calcularResumen(dashPeriodoActual, $('dashPaisFiltro').value);
   const montosTxt = Object.entries(r.porMoneda).map(([m,v])=> `${fmt(v,0)} ${m}`).join(' · ') || 'Sin movimiento aún';
   const rutaTxt = r.rutaTop ? `${r.rutaTop[0]} (${r.rutaTop[1]} op.)` : '—';
-  const etiquetaPeriodo = dashPeriodoActual === 'hoy' ? 'hoy' : dashPeriodoActual === 'semana' ? 'en 7 días' : 'en 30 días';
+  const etiquetaPeriodo = dashPeriodoActual === 'hoy' ? 'hoy'
+    : dashPeriodoActual === 'semana' ? 'en 7 días'
+    : dashPeriodoActual === 'mes' ? 'en 30 días'
+    : `del ${r.desde} al ${r.hasta}`;
   $('dashboardContenido').innerHTML = `
     <div class="field"><label>Operaciones ${etiquetaPeriodo}</label><p style="font-size:26px;margin:2px 0 0;font-weight:700;">${r.totalOps}</p></div>
     <div class="field"><label>Ganancia total ${etiquetaPeriodo}</label><p style="font-size:22px;margin:2px 0 0;font-weight:700;color:var(--brand,#1a7a4c);">${fmt(r.gananciaTotal,4)} USDT</p></div>
@@ -1860,10 +1882,17 @@ document.querySelectorAll('#dashPeriodoBtns .btn-chip').forEach(btn=>{
     document.querySelectorAll('#dashPeriodoBtns .btn-chip').forEach(b=>b.classList.remove('active'));
     btn.classList.add('active');
     dashPeriodoActual = btn.dataset.periodo;
+    $('dashRangoWrap').classList.toggle('hidden', dashPeriodoActual !== 'rango');
+    if (dashPeriodoActual === 'rango' && !$('dashRangoDesde').value){
+      $('dashRangoDesde').value = fechaHaceNDias(6);
+      $('dashRangoHasta').value = todayYYYYMMDD();
+    }
     renderDashboard();
   });
 });
 $('dashPaisFiltro').addEventListener('change', renderDashboard);
+$('dashRangoDesde').addEventListener('change', renderDashboard);
+$('dashRangoHasta').addEventListener('change', renderDashboard);
 
 $('btnAbrirDashboard').addEventListener('click', ()=>{
   $('modalOperadorBg').classList.remove('show');
