@@ -436,7 +436,7 @@ async function handleApi(request, env, url) {
     if (validacion.error) return validacion.error;
     const { nivelCliente, tieneAprobacion } = validacion;
 
-    await env.DB.prepare(
+    const result = await env.DB.prepare(
       `INSERT INTO operaciones
         (user_id, fecha, iso_fecha, operador, cliente_id, nombre, ruta, pais_origen, pais_destino,
          monto, monto_destino, moneda_origen, moneda_destino, tasa_aplicada, ganancia, usdt_movido,
@@ -474,7 +474,7 @@ async function handleApi(request, env, url) {
         h.destinatarioValor || ""
       )
       .run();
-    return json({ ok: true });
+    return json({ ok: true, id: result.meta && result.meta.last_row_id });
   }
 
   // Editar una operacion ya registrada (correccion de datos). Admin puede editar
